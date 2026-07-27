@@ -1,0 +1,74 @@
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+@theme {
+  --font-display: "Space Grotesk", "Helvetica Neue", ui-sans-serif, sans-serif;
+  --font-body: "Inter", "Helvetica Neue", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, monospace;
+
+  /* Brand palette — extracted from the QCyberIndia logo */
+  --color-navy: #012c94;      /* primary brand blue - headings, nav, dark sections */
+  --color-navy-deep: #001c5e; /* darker navy for depth/gradients */
+  --color-red: #ee171c;       /* primary CTA / alert accent */
+  --color-red-deep: #b81014;
+  --color-gold: #fdaa02;      /* secondary accent - highlights, numerals */
+  --color-ink: #111318;       /* near-black text */
+  --color-paper: #fbfaf7;     /* warm off-white background, not stark white */
+  --color-paper-2: #f2f0ea;   /* slightly deeper warm panel */
+  --color-line: #e4e1d8;      /* hairline borders on light bg */
+  --color-fog: #5b5f6b;       /* muted body text on light */
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* subtle status pulse, used sparingly for live indicators */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.status-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* hand-drawn style underline accent used on the signature headline word */
+.underline-swipe {
+  position: relative;
+  white-space: nowrap;
+}
+.underline-swipe::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  bottom: 0.06em;
+  height: 0.22em;
+  background: var(--color-gold);
+  z-index: -1;
+  transform: rotate(-0.6deg);
+}
+
