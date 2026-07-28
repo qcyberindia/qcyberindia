@@ -3,6 +3,7 @@ import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
 import Analytics from "@/components/Analytics";
+import PromiseBanner from "@/components/PromiseBanner";
 import { siteConfig } from "@/lib/site-config";
 
 // NOTE: using next/font/google (Space Grotesk / Inter / JetBrains Mono) is the
@@ -26,11 +27,13 @@ export const metadata: Metadata = {
     siteName: siteConfig.name,
     locale: "en_IN",
     type: "website",
+    images: [{ url: "/og-image.png", width: 1200, height: 630, alt: siteConfig.tagline }],
   },
   twitter: {
     card: "summary_large_image",
     title: `${siteConfig.name} — Your Remote IT Partner`,
     description: siteConfig.description,
+    images: ["/og-image.png"],
   },
 };
 
@@ -40,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         <Analytics />
         <Nav />
+        <PromiseBanner />
         <main>{children}</main>
         <Footer />
       </body>

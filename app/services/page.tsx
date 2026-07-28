@@ -14,12 +14,11 @@ export default function ServicesPage() {
     <div className="mx-auto max-w-6xl px-6 py-16">
       <p className="font-mono text-sm text-[var(--color-red)] mb-4">SERVICES</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)] max-w-2xl">
-        Everything an in-house IT team would cover, minus the hiring
+        The capabilities behind each solution
       </h1>
       <p className="mt-4 max-w-xl text-[var(--color-fog)]">
-        No handoffs between vendors when something breaks, and no pressure on your team to know who's
-        responsible. Managed IT, infrastructure, security, business applications, and growth —
-        one accountable team, one call.
+        You don&apos;t need to know what&apos;s running behind the scenes — that&apos;s the point of working with
+        one accountable partner. But if you want the detail, here&apos;s exactly what we manage.
       </p>
 
       <div className="mt-4">

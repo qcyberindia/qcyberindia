@@ -2,10 +2,11 @@ import Link from "next/link";
 import Image from "next/image";
 
 const links = [
+  { href: "/solutions", label: "Solutions" },
   { href: "/services", label: "Services" },
-  { href: "/about", label: "About" },
-  { href: "/blog", label: "Blog" },
-  { href: "/careers", label: "Careers" },
+  { href: "/industries", label: "Industries" },
+  { href: "/why-qcyberindia", label: "Why Us" },
+  { href: "/resources", label: "Resources" },
   { href: "/contact", label: "Contact" },
 ];
 

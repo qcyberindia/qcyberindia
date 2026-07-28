@@ -14,7 +14,7 @@ export default function CareersPage() {
         No open roles right now
       </h1>
       <p className="mt-4 text-[var(--color-fog)] leading-relaxed max-w-xl">
-        We're a small, hands-on team today, but we're growing. If you work with network
+        We&apos;re a small, hands-on team today, but we&apos;re growing. If you work with network
         infrastructure, security operations, or cloud hosting and want to be first in line when a
         role opens, send your resume to{" "}
         <a href={`mailto:${siteConfig.email.careers}`} className="text-[var(--color-red)] hover:underline">

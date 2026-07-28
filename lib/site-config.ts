@@ -2,9 +2,10 @@ export const siteConfig = {
   name: "QCyberIndia",
   domain: "qcyberindia.com",
   tagline: "Your Remote IT Partner",
-  subTagline: "Stop worrying about technology. Focus on growing your business.",
+  subTagline: "We manage technology. You grow your business.",
+  promise: "One Partner. One Point of Contact. Complete IT Ownership.",
   description:
-    "QCyberIndia is the outsourced IT department for startups, MSMEs, and educational institutions across India — laptops, business email, cloud infrastructure, cybersecurity, networking, backups, monitoring, and employee support, managed by one accountable partner on one monthly plan.",
+    "QCyberIndia is a managed technology partner for startups, MSMEs, and educational institutions across India. One point of contact takes ownership of your technology — keeping your business running, protecting it, building the infrastructure it needs, and helping it grow — so you never have to call five different vendors again.",
   city: "Chennai",
   email: {
     info: "info@qcyberindia.com",
@@ -13,6 +14,55 @@ export const siteConfig = {
     security: "security@qcyberindia.com",
   },
 };
+
+// Outcome-based framing for the homepage/solutions page — what a business
+// owner is actually buying. Technology names live one level deeper, in
+// serviceCategories below, not in the first message someone sees.
+export type OutcomePillar = {
+  id: string;
+  title: string;
+  promise: string;
+  includes: string[];
+};
+
+export const outcomePillars: OutcomePillar[] = [
+  {
+    id: "keep-running",
+    title: "We Keep Your Business Running",
+    promise: "Systems that stay up, and a team that notices before you do.",
+    includes: ["24/7 monitoring", "Automated backups", "Remote support", "Patch management"],
+  },
+  {
+    id: "protect",
+    title: "We Protect Your Business",
+    promise: "Security that's actually watched, not just switched on.",
+    includes: ["Firewall management", "Endpoint security", "Email protection", "Security reviews"],
+  },
+  {
+    id: "build",
+    title: "We Build Your Infrastructure",
+    promise: "The technical foundation, designed around how you work.",
+    includes: ["Cloud & servers", "Networking", "Business Wi-Fi", "Secure remote access"],
+  },
+  {
+    id: "grow",
+    title: "We Help You Grow",
+    promise: "Technology that scales ahead of you, not behind you.",
+    includes: ["Automation", "Technology roadmaps", "Performance & scaling", "Virtual CIO guidance"],
+  },
+];
+
+export type Industry = { id: string; name: string; note: string };
+
+export const industries: Industry[] = [
+  { id: "startups", name: "Startups", note: "Infrastructure that scales with funding rounds and headcount, without a full-time hire." },
+  { id: "msme", name: "MSMEs", note: "Enterprise-grade IT, sized and priced for a growing business." },
+  { id: "education", name: "Educational Institutions", note: "Segmented networks for labs, staff, and students, with audit-ready documentation." },
+  { id: "manufacturing", name: "Manufacturing", note: "Reliable connectivity and security across office and floor systems." },
+  { id: "healthcare", name: "Healthcare", note: "Data protection and uptime for systems that can't afford downtime." },
+  { id: "professional-services", name: "Professional Services", note: "Secure client data handling and dependable day-to-day IT support." },
+  { id: "retail", name: "Retail", note: "POS, connectivity, and backup systems that keep stores running." },
+];
 
 export type ServiceCategory = {
   id: string;
