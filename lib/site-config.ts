@@ -1,12 +1,18 @@
 export const siteConfig = {
   name: "QCyberIndia",
   domain: "qcyberindia.com",
-  tagline: "Your Remote IT Partner",
-  subTagline: "We manage technology. You grow your business.",
-  promise: "One Partner. One Point of Contact. Complete IT Ownership.",
+
+  tagline: "Your Remote Technology Partner",
+
+  subTagline: "We Manage Technology. You Grow Your Business.",
+
+  promise: "Build. Deploy. Secure. Scale.",
+
   description:
-    "QCyberIndia is a managed technology partner for startups, MSMEs, and educational institutions across India. One point of contact takes ownership of your technology — keeping your business running, protecting it, building the infrastructure it needs, and helping it grow — so you never have to call five different vendors again.",
+    "QCyberIndia is your remote technology partner for startups, MSMEs, educational institutions, and growing businesses across India. We take complete ownership of your technology—from cloud infrastructure and networking to cybersecurity, business applications, and day-to-day IT operations—so you can focus on growing your business.",
+
   city: "Chennai",
+
   email: {
     info: "info@qcyberindia.com",
     support: "support@qcyberindia.com",
@@ -25,30 +31,50 @@ export type OutcomePillar = {
   includes: string[];
 };
 
-export const outcomePillars: OutcomePillar[] = [
+export const outcomePillars = [
   {
-    id: "keep-running",
-    title: "We Keep Your Business Running",
-    promise: "Systems that stay up, and a team that notices before you do.",
-    includes: ["24/7 monitoring", "Automated backups", "Remote support", "Patch management"],
+    id: "operations",
+    title: "Keep Your Business Running",
+    promise: "Reliable technology that keeps your business running.",
+    includes: [
+      "Remote IT Support",
+      "24×7 Monitoring",
+      "Patch Management",
+      "Business Continuity",
+    ],
   },
   {
-    id: "protect",
-    title: "We Protect Your Business",
-    promise: "Security that's actually watched, not just switched on.",
-    includes: ["Firewall management", "Endpoint security", "Email protection", "Security reviews"],
+    id: "security",
+    title: "Protect Your Business",
+    promise: "Continuous protection for your people, devices, and data.",
+    includes: [
+      "Endpoint Protection",
+      "Firewall Management",
+      "Email Security",
+      "Security Reviews",
+    ],
   },
   {
-    id: "build",
-    title: "We Build Your Infrastructure",
-    promise: "The technical foundation, designed around how you work.",
-    includes: ["Cloud & servers", "Networking", "Business Wi-Fi", "Secure remote access"],
+    id: "infrastructure",
+    title: "Build Your Infrastructure",
+    promise: "Modern infrastructure built for performance and growth.",
+    includes: [
+      "Cloud Infrastructure",
+      "Networking",
+      "Business Wi-Fi",
+      "Secure Remote Access",
+    ],
   },
   {
-    id: "grow",
-    title: "We Help You Grow",
-    promise: "Technology that scales ahead of you, not behind you.",
-    includes: ["Automation", "Technology roadmaps", "Performance & scaling", "Virtual CIO guidance"],
+    id: "growth",
+    title: "Help Your Business Grow",
+    promise: "Technology planning that grows with your business.",
+    includes: [
+      "Automation",
+      "Technology Roadmaps",
+      "Virtual CIO",
+      "Performance Optimization",
+    ],
   },
 ];
 
@@ -245,7 +271,28 @@ export const pricingTiers: PricingTier[] = [
 ];
 
 export const statusMetrics = [
-  { label: "Avg. response", value: "< 15 min" },
-  { label: "Coverage", value: "24/7 monitoring" },
-  { label: "Billing", value: "One monthly plan" },
-];
+  {
+    label: "Technology",
+    value: "One Partner",
+    description:
+      "One trusted partner for cloud, networking, cybersecurity, websites, and business IT.",
+  },
+  {
+    label: "Support",
+    value: "One Help Desk",
+    description:
+      "One place to call for every technology issue, regardless of the vendor.",
+  },
+  {
+    label: "Pricing",
+    value: "One Monthly Plan",
+    description:
+      "Transparent monthly pricing with no hidden costs or surprise invoices.",
+  },
+  {
+    label: "Accountability",
+    value: "One Team",
+    description:
+      "One point of contact. Complete ownership from start to finish.",
+  },
+]; 

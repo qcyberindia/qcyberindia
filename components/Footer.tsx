@@ -10,7 +10,9 @@ export default function Footer() {
           <div className="flex items-center gap-2.5">
             <Image src="/logo.png" alt="QCyberIndia" width={36} height={36} className="h-9 w-9 object-contain" />
             <span className="font-display font-bold text-lg">
-              QCyber<span className="text-[var(--color-gold)]">India</span>
+            <span className="text-[var(--color-red)]">Q</span>
+            <span className="text-white">Cyber</span>
+            <span className="text-[var(--color-gold)]">India</span>
             </span>
           </div>
           <p className="mt-3 text-sm text-white/70 max-w-xs">{siteConfig.subTagline}</p>

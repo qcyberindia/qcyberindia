@@ -16,8 +16,10 @@ export default function Nav() {
       <div className="mx-auto max-w-6xl px-6 h-18 py-3 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2.5">
           <Image src="/logo.png" alt="QCyberIndia" width={40} height={40} className="h-10 w-10 object-contain" priority />
-          <span className="font-display font-bold text-lg tracking-tight text-[var(--color-navy)]">
-            QCyber<span className="text-[var(--color-red)]">India</span>
+          <span className="font-display font-bold text-lg tracking-tight">
+          <span className="text-[var(--color-red)]">Q</span>
+          <span className="text-[var(--color-navy)]">Cyber</span>
+          <span className="text-[var(--color-gold)]">India</span>
           </span>
         </Link>
         <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--color-fog)]">

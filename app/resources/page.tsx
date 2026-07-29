@@ -37,7 +37,7 @@ const resources = [
 export default function ResourcesPage() {
   return (
     <div className="mx-auto max-w-4xl px-6 py-16">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-4">RESOURCES</p>
+      <p className="eyebrow mb-4">RESOURCES</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)] max-w-2xl">
         Notes, checklists, and guides
       </h1>

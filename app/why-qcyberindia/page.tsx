@@ -33,7 +33,7 @@ const pillars = [
 export default function WhyQCyberIndiaPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-4">WHY QCYBERINDIA</p>
+      <p className="eyebrow mb-4">WHY QCYBERINDIA</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)]">
         Why trust us instead of another IT company?
       </h1>

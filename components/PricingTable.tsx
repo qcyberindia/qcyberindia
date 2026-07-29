@@ -4,7 +4,7 @@ import { pricingTiers } from "@/lib/site-config";
 export default function PricingTable() {
   return (
     <section className="py-14 border-t border-[var(--color-line)]">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-2">PLANS</p>
+      <p className="eyebrow mb-4">PLANS</p>
       <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)] max-w-xl">
         One monthly plan, sized to your team
       </h2>

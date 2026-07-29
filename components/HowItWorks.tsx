@@ -3,7 +3,7 @@ import { processSteps } from "@/lib/site-config";
 export default function HowItWorks() {
   return (
     <section className="py-14 border-t border-[var(--color-line)]">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-2">HOW IT WORKS</p>
+      <p className="eyebrow mb-4">HOW IT WORKS</p>
       <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)] max-w-xl">
         What actually happens after you contact us
       </h2>

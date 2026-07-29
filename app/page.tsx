@@ -9,14 +9,12 @@ export default function HomePage() {
     <div className="mx-auto max-w-6xl px-6">
       {/* Hero */}
       <section className="pt-20 pb-16">
-        <p className="font-mono text-sm text-[var(--color-red)] mb-4">MANAGED TECHNOLOGY PARTNER</p>
+        <p className="eyebrow mb-4">We Manage Technology. You Grow Your Business.</p>
         <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.1] max-w-3xl text-[var(--color-navy)]">
-          Complete IT <span className="underline-swipe">ownership</span>. So you don&apos;t have to think about it.
+          Your Remote <span className="underline-swipe">Technology Partner.</span>. Complete Technology Ownership. One Trusted Partner.
         </h1>
         <p className="mt-6 max-w-xl text-lg text-[var(--color-fog)] leading-relaxed">
-          Stop calling your ISP, your website developer, your email provider, and your firewall
-          consultant separately. Call one partner. We coordinate everything, resolve issues, and
-          take accountability — so your business has an IT department without you having to build one.
+          Stop managing multiple technology vendors. Whether it's your internet, cloud, website, business email, cybersecurity, networking, or day-to-day IT support, QCyberIndia becomes your single point of contact. We coordinate vendors, resolve issues, and take complete ownership of your technology—so you can focus on running and growing your business.
         </p>
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
@@ -38,25 +36,40 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Outcomes, not technologies */}
-      <section className="py-14 border-t border-[var(--color-line)]">
-        <p className="font-mono text-sm text-[var(--color-red)] mb-2">WHAT WE TAKE OWNERSHIP OF</p>
-        <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)] max-w-xl">
-          Think of it like a hospital, not a hardware store
-        </h2>
-        <p className="mt-3 max-w-xl text-[var(--color-fog)]">
-          A hospital doesn&apos;t advertise its MRI machine — it promises complete healthcare. We work the
-          same way: four departments, one accountable team.
-        </p>
-        <div className="mt-8">
-          <OutcomePillars />
-        </div>
-        <div className="mt-6">
-          <Link href="/why-qcyberindia" className="font-mono text-sm text-[var(--color-red)] hover:underline">
-            Why business owners trust us with this →
-          </Link>
-        </div>
-      </section>
+      {/* What We Manage */}
+<section className="py-20 border-t border-[var(--color-line)]">
+  <div className="max-w-4xl">
+    <p className="eyebrow mb-4">
+      WHAT WE MANAGE
+    </p>
+
+    <h2 className="font-display text-3xl md:text-5xl font-bold leading-tight text-[var(--color-navy)]">
+      One Partner.
+      <br />
+      Every Technology Your Business Depends On.
+    </h2>
+
+    <p className="mt-6 text-lg leading-8 text-[var(--color-fog)]">
+      We don't sell isolated IT services. We take complete ownership of your
+      technology environment—from cloud infrastructure and cybersecurity to
+      networking, business applications, websites, and day-to-day IT support.
+      One trusted partner. One accountable team. Zero vendor confusion.
+    </p>
+  </div>
+
+  <div className="mt-14">
+    <OutcomePillars />
+  </div>
+
+  <div className="mt-10 flex justify-center">
+    <Link
+      href="/why-qcyberindia"
+      className="inline-flex items-center rounded-md border border-[var(--color-red)] px-6 py-3 text-sm font-semibold text-[var(--color-red)] transition-all duration-300 hover:bg-[var(--color-red)] hover:text-white"
+    >
+      Learn Why Businesses Choose One Technology Partner →
+    </Link>
+  </div>
+</section>
 
       {/* Who we serve */}
       <section className="py-14 border-t border-[var(--color-line)]">
@@ -64,7 +77,7 @@ export default function HomePage() {
           <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)]">
             Built for teams that don&apos;t want to run an IT department
           </h2>
-          <Link href="/industries" className="font-mono text-sm text-[var(--color-red)] hover:underline">
+          <Link href="/industries" className="eyebrow mb-4</div>">
             All industries →
           </Link>
         </div>
@@ -75,7 +88,7 @@ export default function HomePage() {
             { label: "Educational institutions", copy: "Labs, staff, and student networks, help desk included, with the documentation your board and auditors will ask for." },
           ].map((item) => (
             <div key={item.label} className="rounded-xl border border-[var(--color-line)] bg-white p-6">
-              <h3 className="font-mono text-sm text-[var(--color-red)]">{item.label}</h3>
+              <h3 className="eyebrow mb-4">{item.label}</h3>
               <p className="mt-2 text-sm leading-relaxed text-[var(--color-fog)]">{item.copy}</p>
             </div>
           ))}

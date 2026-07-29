@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function ServicesPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-4">SERVICES</p>
+      <p className="eyebrow mb-4">SERVICES</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)] max-w-2xl">
         The capabilities behind each solution
       </h1>

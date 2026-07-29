@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default function SolutionsPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-16">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-4">SOLUTIONS</p>
+      <p className="eyebrow mb-4">SOLUTIONS</p>
       <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)] max-w-2xl">
         We don&apos;t sell technology. We take ownership of it.
       </h1>

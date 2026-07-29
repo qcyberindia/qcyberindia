@@ -61,8 +61,16 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    return NextResponse.json({ ok: false, error: "Could not send message. Try again shortly." }, { status: 502 });
-  }
+  console.error("Email error:", result.error);
+
+  return NextResponse.json(
+    {
+      ok: false,
+      error: result.error ?? "Unknown email error",
+    },
+    { status: 502 }
+  );
+}
 
   return NextResponse.json({ ok: true });
 }
