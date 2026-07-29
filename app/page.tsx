@@ -8,14 +8,21 @@ export default function HomePage() {
   return (
     <div className="mx-auto max-w-6xl px-6">
       {/* Hero */}
-      <section className="pt-20 pb-16">
-        <p className="eyebrow mb-4">We Manage Technology. You Grow Your Business.</p>
-        <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.1] max-w-3xl text-[var(--color-navy)]">
-          Your Remote <span className="underline-swipe">Technology Partner.</span>. Complete Technology Ownership. One Trusted Partner.
-        </h1>
-        <p className="mt-6 max-w-xl text-lg text-[var(--color-fog)] leading-relaxed">
-          Stop managing multiple technology vendors. Whether it's your internet, cloud, website, business email, cybersecurity, networking, or day-to-day IT support, QCyberIndia becomes your single point of contact. We coordinate vendors, resolve issues, and take complete ownership of your technology—so you can focus on running and growing your business.
-        </p>
+      <section className="pt-12 pb-16">
+       <h1 className="font-display text-4xl md:text-6xl font-bold leading-[1.05] max-w-3xl text-[var(--color-navy)]">
+        Your Remote{" "}
+       <span className="underline-swipe">
+        Technology Partner
+       </span>
+       </h1>
+
+       <p className="mt-5 text-2xl md:text-3xl font-semibold text-[var(--color-red)]">
+       Complete Technology Ownership. One Trusted Partner.
+       </p>
+
+       <p className="mt-6 max-w-xl text-lg leading-relaxed text-[var(--color-fog)]">
+        Stop managing multiple technology vendors. QCyberIndia becomes your single technology partner for cloud, networking, cybersecurity, websites, business email, and IT support. We take complete ownership of your technology so you can focus on growing your business.
+       </p>
         <div className="mt-8 flex flex-wrap gap-4">
           <Link
             href="/contact"
@@ -31,8 +38,8 @@ export default function HomePage() {
           </Link>
         </div>
 
-        <div className="mt-12 max-w-xl">
-          <StatusStrip />
+        <div className="mt-12 max-w-6xl">
+        <StatusStrip />
         </div>
       </section>
 
@@ -77,8 +84,11 @@ export default function HomePage() {
           <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)]">
             Built for teams that don&apos;t want to run an IT department
           </h2>
-          <Link href="/industries" className="eyebrow mb-4</div>">
-            All industries →
+          <Link
+           href="/industries"
+           className="eyebrow hover:underline"
+          >
+           All industries →
           </Link>
         </div>
         <div className="mt-8 grid gap-5 md:grid-cols-3">

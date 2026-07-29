@@ -2,11 +2,14 @@ export const siteConfig = {
   name: "QCyberIndia",
   domain: "qcyberindia.com",
 
+  // Hero headline
   tagline: "Your Remote Technology Partner",
 
+  // Blue announcement bar
   subTagline: "We Manage Technology. You Grow Your Business.",
 
-  promise: "Build. Deploy. Secure. Scale.",
+  // Hero subheading
+  promise: "We Manage Technology. You Grow Your Business.",
 
   description:
     "QCyberIndia is your remote technology partner for startups, MSMEs, educational institutions, and growing businesses across India. We take complete ownership of your technology—from cloud infrastructure and networking to cybersecurity, business applications, and day-to-day IT operations—so you can focus on growing your business.",
@@ -20,7 +23,6 @@ export const siteConfig = {
     security: "security@qcyberindia.com",
   },
 };
-
 // Outcome-based framing for the homepage/solutions page — what a business
 // owner is actually buying. Technology names live one level deeper, in
 // serviceCategories below, not in the first message someone sees.
