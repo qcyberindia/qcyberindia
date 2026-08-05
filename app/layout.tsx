@@ -55,6 +55,9 @@ export const metadata: Metadata = {
     description: siteConfig.description,
     images: ["/og-image.png"],
   },
+  ...(process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION && {
+    verification: { google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION },
+  }),
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -67,9 +70,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     sameAs: [siteConfig.social.instagram, siteConfig.social.twitter, siteConfig.social.linkedin],
   };
 
+  const gtmId = process.env.NEXT_PUBLIC_GTM_ID;
+
   return (
     <html lang="en" className={`${redHatDisplay.variable} ${redHatText.variable} ${redHatMono.variable}`}>
       <body className="antialiased">
+        {gtmId && (
+          <noscript>
+            <iframe
+              src={`https://www.googletagmanager.com/ns.html?id=${gtmId}`}
+              height="0"
+              width="0"
+              style={{ display: "none", visibility: "hidden" }}
+            />
+          </noscript>
+        )}
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
