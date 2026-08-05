@@ -6,7 +6,7 @@ type Status = "idle" | "submitting" | "success" | "error";
 type Touched = { name?: boolean; email?: boolean; message?: boolean };
 
 const inputBase =
-  "w-full rounded-md border bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none transition-colors";
+  "w-full rounded-md border bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none transition-colors focus:ring-2 focus:ring-[var(--color-red)]/10";
 
 function fieldClass(invalid: boolean) {
   return `${inputBase} ${
@@ -93,7 +93,7 @@ export default function ContactForm() {
 
   if (status === "success") {
     return (
-      <div className="card p-6">
+      <div className="rounded-xl border border-[var(--color-line)] bg-white p-6 shadow-sm">
         <p className="font-mono text-sm text-[var(--color-gold)]">MESSAGE SENT</p>
         <p className="mt-2 text-[var(--color-navy)]">
           Thanks for reaching out — we typically reply within one business day.
@@ -103,7 +103,11 @@ export default function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-5">
+    <form
+      onSubmit={handleSubmit}
+      noValidate
+      className="space-y-5 rounded-xl border border-[var(--color-line)] bg-white p-6 shadow-sm sm:p-8"
+    >
       {/* Honeypot field, hidden from real users */}
       <input
         type="text"
@@ -199,7 +203,7 @@ export default function ContactForm() {
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+        className="btn btn-primary transition-transform duration-200 hover:-translate-y-0.5 disabled:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {status === "submitting" ? "Sending…" : "Send message"}
       </button>

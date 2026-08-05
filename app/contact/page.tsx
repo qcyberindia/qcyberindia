@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 
 export default function ContactPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
+    <div className="mx-auto max-w-2xl px-6 py-16">
       <PageHeader
         eyebrow="Contact"
         title="Tell us what you're running, and where it's slowing you down"
@@ -20,7 +20,7 @@ export default function ContactPage() {
             <a href={`mailto:${siteConfig.email.info}`} className="text-[var(--color-red)] hover:underline">
               {siteConfig.email.info}
             </a>
-            .
+            . We typically reply within one business day.
           </>
         }
         maxWidth="max-w-none"
@@ -32,3 +32,4 @@ export default function ContactPage() {
     </div>
   );
 }
+

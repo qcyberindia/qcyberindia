@@ -26,6 +26,7 @@
   --shadow-card-hover: 0 2px 4px rgba(17, 19, 24, 0.06), 0 16px 40px -16px rgba(1, 44, 148, 0.28);
 }
 
+@layer components {
 html {
   scroll-behavior: smooth;
 }
@@ -258,3 +259,4 @@ textarea:focus-visible,
   text-transform: uppercase;
   color: #111827;
 }
+} /* end @layer components */

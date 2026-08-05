@@ -24,8 +24,8 @@ export default function Nav() {
 
   return (
     <header className="border-b border-[var(--color-line)] bg-[var(--color-paper)]/95 backdrop-blur sticky top-0 z-50">
-      <div className="mx-auto max-w-6xl px-6 h-18 py-3 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-2.5" onClick={() => setOpen(false)}>
+      <div className="mx-auto max-w-6xl px-6 h-[4.5rem] py-3 flex items-center justify-between">
+      <Link href="/" className="flex items-center gap-2.5 shrink-0" onClick={() => setOpen(false)}>
           <Image src="/logo.png" alt="QCyberIndia" width={40} height={40} className="h-10 w-10 object-contain" priority />
           <span className="font-display font-bold text-lg tracking-tight">
             <span className="text-[var(--color-red)]">Q</span>
@@ -34,7 +34,7 @@ export default function Nav() {
           </span>
         </Link>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-[var(--color-fog)]">
+        <nav className="hidden lg:flex items-center gap-6 text-sm font-medium text-[var(--color-fog)]">
           {links.map((l) => {
             const active = isActive(l.href);
             return (
@@ -57,7 +57,7 @@ export default function Nav() {
           })}
         </nav>
 
-        <Link href="/contact" className="btn btn-primary hidden md:inline-flex">
+        <Link href="/contact" className="btn btn-primary hidden lg:inline-flex shrink-0">
           Book a free assessment
         </Link>
 
@@ -67,7 +67,7 @@ export default function Nav() {
           aria-label={open ? "Close menu" : "Open menu"}
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="md:hidden inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-navy)] hover:bg-[var(--color-paper-2)] transition-colors"
+          className="lg:hidden inline-flex h-10 w-10 items-center justify-center rounded-md text-[var(--color-navy)] hover:bg-[var(--color-paper-2)] transition-colors"
         >
           {open ? <X size={22} /> : <Menu size={22} />}
         </button>
@@ -75,7 +75,7 @@ export default function Nav() {
 
       {/* Mobile menu */}
       <div
-        className={`md:hidden overflow-hidden border-t border-[var(--color-line)] bg-[var(--color-paper)] transition-[max-height] duration-300 ease-in-out ${
+        className={`lg:hidden overflow-hidden border-t border-[var(--color-line)] bg-[var(--color-paper)] transition-[max-height] duration-300 ease-in-out ${
           open ? "max-h-96" : "max-h-0 border-t-0"
         }`}
       >

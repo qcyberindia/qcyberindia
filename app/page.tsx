@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Cloud, Network, ShieldCheck, LayoutGrid, Globe, LifeBuoy, ArrowRight } from "lucide-react";
 import StatusStrip from "@/components/StatusStrip";
 import HowItWorks from "@/components/HowItWorks";
 import PricingTable from "@/components/PricingTable";
@@ -68,13 +69,22 @@ export default function HomePage() {
     </p>
 
     <div className="mt-6 flex flex-wrap gap-2.5">
-      {["Cloud Infrastructure", "Networking", "Cybersecurity", "Business Applications", "Websites", "IT Support"].map((tag) => (
-        <span
-          key={tag}
-          className="rounded-full border border-[var(--color-line)] bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--color-navy)]"
+      {[
+        { label: "Cloud Infrastructure", href: "/services#infrastructure", Icon: Cloud },
+        { label: "Networking", href: "/services#infrastructure", Icon: Network },
+        { label: "Cybersecurity", href: "/services#security", Icon: ShieldCheck },
+        { label: "Business Applications", href: "/services#business-apps", Icon: LayoutGrid },
+        { label: "Websites", href: "/services#business-apps", Icon: Globe },
+        { label: "IT Support", href: "/services#managed-it", Icon: LifeBuoy },
+      ].map(({ label, href, Icon }) => (
+        <Link
+          key={label}
+          href={href}
+          className="group inline-flex items-center gap-2 rounded-full border border-[var(--color-line)] bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--color-navy)] transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--color-navy)] hover:bg-[var(--color-navy)] hover:text-white hover:shadow-md"
         >
-          {tag}
-        </span>
+          <Icon size={14} className="text-[var(--color-gold)] transition-colors duration-200 group-hover:text-[var(--color-gold)]" />
+          {label}
+        </Link>
       ))}
     </div>
   </div>
@@ -98,8 +108,12 @@ export default function HomePage() {
           <h2 className="font-display text-2xl md:text-3xl font-extrabold text-[var(--color-navy)]">
             Built for teams that don&apos;t want to run an IT department
           </h2>
-          <Link href="/industries" className="eyebrow hover:underline">
-            All industries →
+          <Link
+            href="/industries"
+            className="group eyebrow inline-flex items-center gap-1.5 rounded-full border border-transparent px-3.5 py-1.5 transition-all duration-200 hover:border-[var(--color-red)]/30 hover:bg-[var(--color-red)]/5"
+          >
+            All industries
+            <ArrowRight size={14} className="transition-transform duration-200 group-hover:translate-x-1" />
           </Link>
         </div>
         <div className="mt-8 grid gap-5 md:grid-cols-3">
