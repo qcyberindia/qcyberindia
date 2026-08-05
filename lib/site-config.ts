@@ -22,6 +22,12 @@ export const siteConfig = {
     careers: "careers@qcyberindia.com",
     security: "security@qcyberindia.com",
   },
+
+  social: {
+    instagram: "https://www.instagram.com/qcyberindia?igsh=dWNzdzY1ZHpnaTJ6",
+    twitter: "https://x.com/QCyberIndia",
+    linkedin: "https://www.linkedin.com/in/qcyberindia",
+  },
 };
 // Outcome-based framing for the homepage/solutions page — what a business
 // owner is actually buying. Technology names live one level deeper, in

@@ -1,25 +1,69 @@
 "use client";
 
-import { useState, FormEvent } from "react";
+import { useState, FormEvent, ChangeEvent } from "react";
 
 type Status = "idle" | "submitting" | "success" | "error";
+type Touched = { name?: boolean; email?: boolean; message?: boolean };
+
+const inputBase =
+  "w-full rounded-md border bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none transition-colors";
+
+function fieldClass(invalid: boolean) {
+  return `${inputBase} ${
+    invalid
+      ? "border-[#dc2626] focus:border-[#dc2626]"
+      : "border-[var(--color-line)] focus:border-[var(--color-red)]"
+  }`;
+}
+
+function isValidEmail(v: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+}
 
 export default function ContactForm() {
   const [status, setStatus] = useState<Status>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [values, setValues] = useState({ name: "", email: "", company: "", message: "" });
+  const [touched, setTouched] = useState<Touched>({});
+
+  const errors = {
+    name: touched.name && values.name.trim() === "" ? "Please enter your name." : "",
+    email:
+      touched.email && values.email.trim() === ""
+        ? "Please enter your email."
+        : touched.email && !isValidEmail(values.email)
+        ? "That doesn't look like a valid email."
+        : "",
+    message: touched.message && values.message.trim() === "" ? "Let us know what you need." : "",
+  };
+
+  function handleChange(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    const { name, value } = e.target;
+    setValues((v) => ({ ...v, [name]: value }));
+  }
+
+  function handleBlur(e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
+    setTouched((t) => ({ ...t, [e.target.name]: true }));
+  }
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setTouched({ name: true, email: true, message: true });
+
+    if (values.name.trim() === "" || !isValidEmail(values.email) || values.message.trim() === "") {
+      return;
+    }
+
     setStatus("submitting");
     setErrorMsg("");
 
     const form = e.currentTarget;
     const data = new FormData(form);
     const payload = {
-      name: String(data.get("name") || ""),
-      email: String(data.get("email") || ""),
-      company: String(data.get("company") || ""),
-      message: String(data.get("message") || ""),
+      name: values.name,
+      email: values.email,
+      company: values.company,
+      message: values.message,
       website: String(data.get("website") || ""), // honeypot
     };
 
@@ -39,6 +83,8 @@ export default function ContactForm() {
 
       setStatus("success");
       form.reset();
+      setValues({ name: "", email: "", company: "", message: "" });
+      setTouched({});
     } catch {
       setStatus("error");
       setErrorMsg("Network error. Check your connection and try again.");
@@ -47,7 +93,7 @@ export default function ContactForm() {
 
   if (status === "success") {
     return (
-      <div className="rounded-lg border border-[var(--color-gold)]/40 bg-[#ffffff] p-6">
+      <div className="card p-6">
         <p className="font-mono text-sm text-[var(--color-gold)]">MESSAGE SENT</p>
         <p className="mt-2 text-[var(--color-navy)]">
           Thanks for reaching out — we typically reply within one business day.
@@ -57,7 +103,7 @@ export default function ContactForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
+    <form onSubmit={handleSubmit} noValidate className="space-y-5">
       {/* Honeypot field, hidden from real users */}
       <input
         type="text"
@@ -76,9 +122,18 @@ export default function ContactForm() {
           id="name"
           name="name"
           type="text"
-          required
-          className="w-full rounded-md border border-[var(--color-line)] bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none focus:border-[var(--color-red)]"
+          value={values.name}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={!!errors.name}
+          aria-describedby={errors.name ? "name-error" : undefined}
+          className={fieldClass(!!errors.name)}
         />
+        {errors.name && (
+          <p id="name-error" className="mt-1.5 text-xs text-[#dc2626]">
+            {errors.name}
+          </p>
+        )}
       </div>
 
       <div>
@@ -89,9 +144,18 @@ export default function ContactForm() {
           id="email"
           name="email"
           type="email"
-          required
-          className="w-full rounded-md border border-[var(--color-line)] bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none focus:border-[var(--color-red)]"
+          value={values.email}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={!!errors.email}
+          aria-describedby={errors.email ? "email-error" : undefined}
+          className={fieldClass(!!errors.email)}
         />
+        {errors.email && (
+          <p id="email-error" className="mt-1.5 text-xs text-[#dc2626]">
+            {errors.email}
+          </p>
+        )}
       </div>
 
       <div>
@@ -102,7 +166,9 @@ export default function ContactForm() {
           id="company"
           name="company"
           type="text"
-          className="w-full rounded-md border border-[var(--color-line)] bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none focus:border-[var(--color-red)]"
+          value={values.company}
+          onChange={handleChange}
+          className={fieldClass(false)}
         />
       </div>
 
@@ -113,20 +179,27 @@ export default function ContactForm() {
         <textarea
           id="message"
           name="message"
-          required
           rows={5}
-          className="w-full rounded-md border border-[var(--color-line)] bg-[#ffffff] px-3.5 py-2.5 text-[var(--color-navy)] outline-none focus:border-[var(--color-red)]"
+          value={values.message}
+          onChange={handleChange}
+          onBlur={handleBlur}
+          aria-invalid={!!errors.message}
+          aria-describedby={errors.message ? "message-error" : undefined}
+          className={fieldClass(!!errors.message)}
         />
+        {errors.message && (
+          <p id="message-error" className="mt-1.5 text-xs text-[#dc2626]">
+            {errors.message}
+          </p>
+        )}
       </div>
 
-      {status === "error" && (
-        <p className="font-mono text-sm text-[#dc2626]">{errorMsg}</p>
-      )}
+      {status === "error" && <p className="font-mono text-sm text-[#dc2626]">{errorMsg}</p>}
 
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="inline-flex items-center rounded-md bg-[var(--color-red)] px-5 py-3 text-sm font-medium text-[#ffffff] hover:opacity-90 transition-opacity disabled:opacity-50"
+        className="btn btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {status === "submitting" ? "Sending…" : "Send message"}
       </button>

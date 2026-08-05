@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Red_Hat_Display, Red_Hat_Text, Red_Hat_Mono } from "next/font/google";
 import "./globals.css";
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
@@ -6,11 +7,30 @@ import Analytics from "@/components/Analytics";
 import PromiseBanner from "@/components/PromiseBanner";
 import { siteConfig } from "@/lib/site-config";
 
-// NOTE: using next/font/google (Space Grotesk / Inter / JetBrains Mono) is the
-// intended setup, but this build environment can't reach fonts.googleapis.com.
-// Swap this back to next/font/google on your dev machine / deploy target —
-// app/globals.css already defines the --font-display/--font-body/--font-mono
-// variables, so no other file needs to change.
+// Type system: Red Hat Display / Text / Mono — one cohesive family from an
+// enterprise open-source infrastructure company, not three fonts picked for
+// looks alone. Fits a brand whose whole pitch is "we take ownership of your
+// infrastructure" more honestly than a generic geometric-sans pairing would.
+const redHatDisplay = Red_Hat_Display({
+  subsets: ["latin"],
+  weight: ["600", "700", "800"],
+  variable: "--font-redhat-display",
+  display: "swap",
+});
+
+const redHatText = Red_Hat_Text({
+  subsets: ["latin"],
+  weight: ["400", "500", "600"],
+  variable: "--font-redhat-text",
+  display: "swap",
+});
+
+const redHatMono = Red_Hat_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-redhat-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL(`https://${siteConfig.domain}`),
@@ -38,9 +58,22 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: siteConfig.name,
+    url: `https://${siteConfig.domain}`,
+    logo: `https://${siteConfig.domain}/logo.png`,
+    sameAs: [siteConfig.social.instagram, siteConfig.social.twitter, siteConfig.social.linkedin],
+  };
+
   return (
-    <html lang="en">
+    <html lang="en" className={`${redHatDisplay.variable} ${redHatText.variable} ${redHatMono.variable}`}>
       <body className="antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        />
         <Analytics />
         <Nav />
         <PromiseBanner />

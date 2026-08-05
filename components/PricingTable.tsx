@@ -3,9 +3,9 @@ import { pricingTiers } from "@/lib/site-config";
 
 export default function PricingTable() {
   return (
-    <section className="py-14 border-t border-[var(--color-line)]">
+    <section className="section-tight border-t border-[var(--color-line)]">
       <p className="eyebrow mb-4">PLANS</p>
-      <h2 className="font-display text-2xl md:text-3xl font-bold text-[var(--color-navy)] max-w-xl">
+      <h2 className="font-display text-2xl md:text-3xl font-extrabold text-[var(--color-navy)] max-w-xl">
         One monthly plan, sized to your team
       </h2>
       <p className="mt-3 max-w-xl text-[var(--color-fog)]">
@@ -17,10 +17,10 @@ export default function PricingTable() {
         {pricingTiers.map((tier) => (
           <div
             key={tier.name}
-            className={`rounded-xl border p-7 flex flex-col ${
+            className={`rounded-xl border p-7 flex flex-col transition-all duration-300 hover:-translate-y-1 ${
               tier.highlighted
                 ? "border-[var(--color-red)] bg-white shadow-lg shadow-red-100 relative"
-                : "border-[var(--color-line)] bg-white"
+                : "border-[var(--color-line)] bg-white hover:shadow-lg"
             }`}
           >
             {tier.highlighted && (
@@ -28,7 +28,7 @@ export default function PricingTable() {
                 Most common
               </span>
             )}
-            <h3 className="font-display text-xl font-bold text-[var(--color-navy)]">{tier.name}</h3>
+            <h3 className="font-display text-xl font-extrabold text-[var(--color-navy)]">{tier.name}</h3>
             <p className="mt-1 text-sm text-[var(--color-fog)]">{tier.audience}</p>
             <ul className="mt-5 space-y-2.5 flex-1">
               {tier.features.map((f) => (
@@ -40,11 +40,7 @@ export default function PricingTable() {
             </ul>
             <Link
               href="/contact"
-              className={`mt-6 inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-semibold transition-colors ${
-                tier.highlighted
-                  ? "bg-[var(--color-red)] text-white hover:bg-[var(--color-red-deep)]"
-                  : "border border-[var(--color-navy)] text-[var(--color-navy)] hover:bg-[var(--color-navy)] hover:text-white"
-              }`}
+              className={`mt-6 btn ${tier.highlighted ? "btn-primary" : "btn-secondary"}`}
             >
               Talk to us
             </Link>

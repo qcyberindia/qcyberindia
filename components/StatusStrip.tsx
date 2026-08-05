@@ -40,7 +40,7 @@ export default function StatusStrip() {
                     {m.label}
                   </p>
 
-                  <h3 className="text-xl font-bold leading-tight text-[var(--color-navy)]">
+                  <h3 className="text-xl font-extrabold leading-tight text-[var(--color-navy)]">
                     {m.value}
                   </h3>
                 </div>

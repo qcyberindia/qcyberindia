@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import PageHeader from "@/components/PageHeader";
 import { siteConfig } from "@/lib/site-config";
 
 export const metadata: Metadata = {
@@ -33,37 +34,31 @@ const pillars = [
 export default function WhyQCyberIndiaPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
-      <p className="eyebrow mb-4">WHY QCYBERINDIA</p>
-      <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)]">
-        Why trust us instead of another IT company?
-      </h1>
-      <p className="mt-4 text-[var(--color-fog)] leading-relaxed">
-        Fair question — we&apos;re a newer partner, not a 20-year-old firm with a wall of logos. Here&apos;s
-        what we can honestly stand behind instead: how we work, and what we commit to before you
-        sign anything.
-      </p>
+      <PageHeader
+        eyebrow="Why QCyberIndia"
+        title="Why trust us instead of another IT company?"
+        description="Fair question — we're a newer partner, not a 20-year-old firm with a wall of logos. Here's what we can honestly stand behind instead: how we work, and what we commit to before you sign anything."
+        maxWidth="max-w-none"
+      />
 
       <div className="mt-10 space-y-8">
         {pillars.map((p) => (
           <div key={p.title} className="border-l-2 border-[var(--color-gold)] pl-5">
-            <h3 className="font-display font-semibold text-lg text-[var(--color-navy)]">{p.title}</h3>
+            <h3 className="font-display font-bold text-lg text-[var(--color-navy)]">{p.title}</h3>
             <p className="mt-1.5 text-[var(--color-fog)] leading-relaxed">{p.body}</p>
           </div>
         ))}
       </div>
 
-      <div className="mt-14 rounded-xl border border-[var(--color-line)] bg-white p-8">
-        <p className="font-display text-xl font-semibold text-[var(--color-navy)]">
+      <div className="mt-14 card p-8">
+        <p className="font-display text-xl font-bold text-[var(--color-navy)]">
           Not sure yet? Start with the free assessment.
         </p>
         <p className="mt-2 text-[var(--color-fog)]">
           No commitment — we look at your current setup, tell you honestly what needs attention,
           and you decide from there whether {siteConfig.name} is the right fit.
         </p>
-        <Link
-          href="/contact"
-          className="mt-5 inline-flex items-center rounded-md bg-[var(--color-red)] px-6 py-3 text-sm font-semibold text-white hover:bg-[var(--color-red-deep)] transition-colors"
-        >
+        <Link href="/contact" className="mt-5 btn btn-primary">
           Book a free IT assessment
         </Link>
       </div>

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import PageHeader from "@/components/PageHeader";
 
 export const metadata: Metadata = {
   title: "About",
@@ -8,10 +9,11 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-3xl px-6 py-16">
-      <p className="font-mono text-sm text-[var(--color-red)] mb-4">ABOUT</p>
-      <h1 className="font-display text-3xl md:text-4xl font-bold text-[var(--color-navy)]">
-        The IT department you don&apos;t have to hire, manage, or worry about
-      </h1>
+      <PageHeader
+        eyebrow="About"
+        title="The IT department you don't have to hire, manage, or worry about"
+        maxWidth="max-w-none"
+      />
       <div className="mt-8 space-y-5 text-[var(--color-fog)] leading-relaxed">
         <p>
           QCyberIndia started from a simple observation: most startups, MSMEs, and educational
