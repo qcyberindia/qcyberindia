@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Reveal from "@/components/Reveal";
 
 type Story = {
   id: string;
@@ -89,24 +91,56 @@ const stories: Story[] = [
 ];
 
 export default function QbidsShowcase() {
+  const [activeId, setActiveId] = useState(stories[0].id);
+  const sectionsRef = useRef<Record<string, HTMLElement | null>>({});
+
+  // Scroll-spy: highlight the tab for whichever section is currently in view,
+  // instead of relying on a scrollable tab strip.
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (visible?.target.id) setActiveId(visible.target.id);
+      },
+      { rootMargin: "-35% 0px -55% 0px", threshold: [0, 0.25, 0.5, 0.75, 1] }
+    );
+
+    stories.forEach((s) => {
+      const el = sectionsRef.current[s.id];
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   function scrollTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
   return (
     <div>
-      {/* Sticky tab nav */}
-      <div className="sticky top-0 z-10 -mx-6 border-y border-[#1e2a38] bg-[#0a0e13]/95 px-6 py-3 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl gap-1 overflow-x-auto sm:justify-center">
-          {stories.map((s) => (
-            <button
-              key={s.id}
-              onClick={() => scrollTo(s.id)}
-              className="whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm text-[#8aa0b4] transition-colors hover:bg-[#111823] hover:text-[#3fd0c9]"
-            >
-              {s.tab}
-            </button>
-          ))}
+      {/* Tab nav — wraps instead of scrolling, so nothing gets clipped or needs a scrollbar */}
+      <div className="sticky top-[57px] z-10 border-y border-[#1e2a38] bg-[#0a0e13]/95 px-6 py-3 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-wrap justify-center gap-1.5">
+          {stories.map((s) => {
+            const active = activeId === s.id;
+            return (
+              <button
+                key={s.id}
+                onClick={() => scrollTo(s.id)}
+                aria-current={active}
+                className={`rounded-full px-3.5 py-1.5 font-display text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-[#3fd0c9]/10 text-[#3fd0c9]"
+                    : "text-[#8aa0b4] hover:bg-[#111823] hover:text-[#e6edf3]"
+                }`}
+              >
+                {s.tab}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -115,25 +149,36 @@ export default function QbidsShowcase() {
           <section
             key={s.id}
             id={s.id}
-            className={`scroll-mt-20 py-16 ${i !== stories.length - 1 ? "border-b border-[#1e2a38]" : ""}`}
+            ref={(el) => {
+              sectionsRef.current[s.id] = el;
+            }}
+            className={`scroll-mt-32 py-16 ${i !== stories.length - 1 ? "border-b border-[#1e2a38]" : ""}`}
           >
-            <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#3fd0c9]">{s.eyebrow}</p>
-            <p className="mt-3 text-[#8aa0b4]">{s.userLine}</p>
-            <p className="mt-1 text-xl font-semibold text-[#e6edf3]">{s.qbidsLine}</p>
+            <Reveal>
+              <p className="font-display text-xs font-semibold uppercase tracking-[0.12em] text-[#3fd0c9]">
+                {s.eyebrow}
+              </p>
+              <p className="mt-3 text-[#8aa0b4]">{s.userLine}</p>
+              <p className="mt-1 font-display text-xl font-semibold tracking-tight text-[#e6edf3]">
+                {s.qbidsLine}
+              </p>
+            </Reveal>
 
-            <div className="mt-6 overflow-hidden rounded-xl border border-[#1e2a38] shadow-2xl shadow-black/40">
-              <Image
-                src={s.image}
-                alt={s.alt}
-                width={2048}
-                height={1185}
-                className="h-auto w-full"
-                sizes="(min-width: 768px) 800px, 100vw"
-                quality={82}
-                priority={i === 0}
-                loading={i === 0 ? undefined : "lazy"}
-              />
-            </div>
+            <Reveal delay={100}>
+              <div className="mt-6 overflow-hidden rounded-xl border border-[#1e2a38] shadow-2xl shadow-black/40 transition-colors hover:border-[#3fd0c9]/30">
+                <Image
+                  src={s.image}
+                  alt={s.alt}
+                  width={2048}
+                  height={1185}
+                  className="h-auto w-full"
+                  sizes="(min-width: 768px) 800px, 100vw"
+                  quality={82}
+                  priority={i === 0}
+                  loading={i === 0 ? undefined : "lazy"}
+                />
+              </div>
+            </Reveal>
           </section>
         ))}
       </div>

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import { CheckCircle2, Copy, Loader2 } from "lucide-react";
 
 type Status = "idle" | "submitting" | "success" | "duplicate" | "error";
 
 const PORTALS = ["GeM", "CPPP", "State e-Procurement", "Other"];
 
 const inputBase =
-  "w-full rounded-md border border-[#1e2a38] bg-[#111823] px-3.5 py-2.5 text-[#e6edf3] placeholder:text-[#8aa0b4]/60 outline-none transition-colors focus:border-[#3fd0c9] focus:ring-2 focus:ring-[#3fd0c9]/15";
+  "w-full rounded-md border border-[#1e2a38] bg-[#0c1016] px-3.5 py-2.5 text-[#e6edf3] placeholder:text-[#8aa0b4]/60 outline-none transition-colors focus:border-[#3fd0c9] focus:ring-2 focus:ring-[#3fd0c9]/15";
 
 const nextSteps = [
   { label: "Registration", done: true },
@@ -69,12 +70,19 @@ export default function QbidsRegisterForm() {
 
   if (status === "success" || status === "duplicate") {
     return (
-      <div className="rounded-xl border border-[#1e2a38] bg-[#111823] p-8">
+      <div className="rounded-2xl border border-[#1e2a38] bg-[#111823] p-8 shadow-[0_24px_48px_-24px_rgba(63,208,201,0.15)]">
         <div className="text-center">
-          <p className="font-mono text-xs uppercase tracking-[0.14em] text-[#3fd0c9]">
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[#3fd0c9]/30 bg-[#3fd0c9]/10">
+            {status === "duplicate" ? (
+              <Copy size={18} className="text-[#3fd0c9]" />
+            ) : (
+              <CheckCircle2 size={20} className="text-[#3fd0c9]" />
+            )}
+          </div>
+          <p className="mt-4 font-display text-xs font-semibold uppercase tracking-[0.12em] text-[#3fd0c9]">
             {status === "duplicate" ? "Already on the list" : "You're on the Qbids Beta list"}
           </p>
-          <p className="mt-3 text-lg font-semibold text-[#e6edf3]">
+          <p className="mt-3 font-display text-lg font-semibold tracking-tight text-[#e6edf3]">
             {status === "duplicate"
               ? "This email is already registered — you're all set."
               : "We're inviting the first group of tender-active businesses to help shape Qbids."}
@@ -85,7 +93,7 @@ export default function QbidsRegisterForm() {
         </div>
 
         <div className="mt-8">
-          <p className="text-center text-xs font-medium uppercase tracking-wide text-[#8aa0b4]">
+          <p className="text-center font-display text-[11px] font-semibold uppercase tracking-[0.1em] text-[#8aa0b4]">
             What happens next?
           </p>
           <div className="mt-4 flex items-center justify-between gap-1">
@@ -116,7 +124,7 @@ export default function QbidsRegisterForm() {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="space-y-5 rounded-xl border border-[#1e2a38] bg-[#111823] p-6 sm:p-8"
+      className="relative space-y-5 rounded-2xl border border-[#1e2a38] bg-[#111823] p-6 shadow-[0_24px_48px_-24px_rgba(0,0,0,0.5)] sm:p-8"
     >
       {/* Honeypot field — hidden from real users via CSS, bots fill every field */}
       <div className="absolute left-[-9999px]" aria-hidden="true">
@@ -155,8 +163,10 @@ export default function QbidsRegisterForm() {
       </div>
 
       <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-[#8aa0b4]">Which portals do you use?</p>
-        <div className="mt-2.5 flex flex-wrap gap-2">
+        <p id="portals-label" className="text-xs font-medium uppercase tracking-wide text-[#8aa0b4]">
+          Which portals do you use?
+        </p>
+        <div className="mt-2.5 flex flex-wrap gap-2" role="group" aria-labelledby="portals-label">
           {PORTALS.map((p) => {
             const active = portals.includes(p);
             return (
@@ -164,6 +174,7 @@ export default function QbidsRegisterForm() {
                 key={p}
                 type="button"
                 onClick={() => togglePortal(p)}
+                aria-pressed={active}
                 className={`rounded-full border px-3.5 py-1.5 text-sm transition-colors ${
                   active
                     ? "border-[#3fd0c9] bg-[#3fd0c9]/10 text-[#3fd0c9]"
@@ -191,7 +202,7 @@ export default function QbidsRegisterForm() {
       </div>
 
       {status === "error" && (
-        <p className="rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
+        <p role="alert" className="rounded-md border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300">
           {errorMsg}
         </p>
       )}
@@ -199,8 +210,9 @@ export default function QbidsRegisterForm() {
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="w-full rounded-md bg-[#3fd0c9] px-4 py-3 font-semibold text-[#0c1016] transition-colors hover:bg-[#22968f] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-8"
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-[#3fd0c9] px-4 py-3 font-semibold text-[#0c1016] transition-colors hover:bg-[#22968f] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-8"
       >
+        {status === "submitting" && <Loader2 size={15} className="animate-spin" />}
         {status === "submitting" ? "Joining…" : "Join Qbids Beta"}
       </button>
 
