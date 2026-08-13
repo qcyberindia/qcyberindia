@@ -24,7 +24,7 @@ export async function sendEmail(
 
   try {
     const { error } = await resend.emails.send({
-      from: "QCyberIndia <info@qcyberindia.com>",
+      from: input.from,
       to: input.to,
       subject: input.subject,
       text: input.text,

@@ -1,10 +1,7 @@
 import type { Metadata } from "next";
 import { Red_Hat_Display, Red_Hat_Text, Red_Hat_Mono } from "next/font/google";
 import "./globals.css";
-import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
 import Analytics from "@/components/Analytics";
-import PromiseBanner from "@/components/PromiseBanner";
 import { siteConfig } from "@/lib/site-config";
 
 // Type system: Red Hat Display / Text / Mono — one cohesive family from an
@@ -90,10 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
         <Analytics />
-        <Nav />
-        <PromiseBanner />
-        <main>{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );
