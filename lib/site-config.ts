@@ -26,7 +26,7 @@ export const siteConfig = {
   social: {
     instagram: "https://www.instagram.com/qcyberindia?igsh=dWNzdzY1ZHpnaTJ6",
     twitter: "https://x.com/QCyberIndia",
-    linkedin: "https://www.linkedin.com/in/qcyberindia",
+    linkedin: "https://www.linkedin.com/company/qcyberindia",
   },
 };
 // Outcome-based framing for the homepage/solutions page — what a business
