@@ -1,30 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+
 import { getOrCreateQFinanceUser, isDbConfigured } from "@/lib/db";
 import { createMagicLinkToken } from "@/lib/qfinance-community-auth";
 import { sendEmail } from "@/lib/email";
-import { siteConfig } from "@/lib/site-config";
+import { qfinanceConfig } from "@/lib/qfinance-config";
 
-function isValidEmail(email: string) {
+function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
-// Requests a magic-link sign-in email for QFinance Community. Same
-// operation whether the email is new or returning — no separate "sign up"
-// endpoint, since there's no password to set.
+// Requests a magic-link sign-in email for QFinance Community.
+// The same operation handles both new and returning users because
+// QFinance Community uses passwordless authentication.
 export async function POST(req: NextRequest) {
   if (!isDbConfigured()) {
-    return NextResponse.json({ ok: false, error: "Community sign-in isn't available yet." }, { status: 503 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Community sign-in isn't available yet.",
+      },
+      { status: 503 },
+    );
   }
 
-  let body: { email?: string; displayName?: string; website?: string };
+  let body: {
+    email?: string;
+    displayName?: string;
+    website?: string;
+  };
+
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Invalid request body",
+      },
+      { status: 400 },
+    );
   }
 
+  // Honeypot field for basic bot protection.
+  // Return success without performing any authentication action.
   if (body.website) {
-    // honeypot — pretend success, do nothing
     return NextResponse.json({ ok: true });
   }
 
@@ -32,28 +51,62 @@ export async function POST(req: NextRequest) {
   const displayName = body.displayName?.trim() ?? "";
 
   if (!isValidEmail(email)) {
-    return NextResponse.json({ ok: false, error: "Enter a valid email address" }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Enter a valid email address",
+      },
+      { status: 400 },
+    );
   }
+
   if (!displayName) {
-    return NextResponse.json({ ok: false, error: "Enter a display name" }, { status: 400 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Enter a display name",
+      },
+      { status: 400 },
+    );
   }
 
   const user = await getOrCreateQFinanceUser(email, displayName);
+
   if (!user) {
-    return NextResponse.json({ ok: false, error: "Something went wrong. Please try again." }, { status: 500 });
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Something went wrong. Please try again.",
+      },
+      { status: 500 },
+    );
   }
 
   const token = createMagicLinkToken(user.email, user.display_name);
+
   if (!token) {
-    console.error("QFinance community auth: QFINANCE_AUTH_SECRET is not configured.");
-    return NextResponse.json({ ok: false, error: "Community sign-in isn't configured yet." }, { status: 503 });
+    console.error(
+      "QFinance community auth: QFINANCE_AUTH_SECRET is not configured.",
+    );
+
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Community sign-in isn't configured yet.",
+      },
+      { status: 503 },
+    );
   }
 
-  const verifyUrl = `https://${siteConfig.domain}/api/qfinance/community/auth/verify?token=${token}`;
+  const appUrl = qfinanceConfig.appUrl.replace(/\/$/, "");
+
+  const verifyUrl =
+    `${appUrl}/api/qfinance/community/auth/verify?token=` +
+    encodeURIComponent(token);
 
   const result = await sendEmail({
     to: user.email,
-    from: `noreply@${siteConfig.domain}`,
+    from: `noreply@${qfinanceConfig.domain}`,
     subject: "Sign in to QFinance Community",
     text: [
       `Hi ${user.display_name},`,
@@ -67,16 +120,19 @@ export async function POST(req: NextRequest) {
   });
 
   if (!result.ok) {
-    // Dev/local fallback ONLY — never log a raw magic-link token in
-    // production. If email delivery fails in prod, the request still
-    // returns ok (below) so the endpoint doesn't reveal whether an email
-    // exists; the failure is recorded without the token so it's still
-    // debuggable from logs/metrics.
+    // Never log the raw magic-link token in production.
+    // A local development fallback is allowed for debugging.
     if (process.env.NODE_ENV !== "production") {
-      console.warn("QFinance community magic link email failed to send:", result.error);
+      console.warn(
+        "QFinance community magic link email failed to send:",
+        result.error,
+      );
       console.warn("Magic link (dev fallback):", verifyUrl);
     } else {
-      console.error("QFinance community magic link email failed to send:", result.error);
+      console.error(
+        "QFinance community magic link email failed to send:",
+        result.error,
+      );
     }
   }
 
