@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import JourneyTimeline from "@/components/qfinance/learning/JourneyTimeline";
+import ScrollToJourney from "@/components/qfinance/learning/ScrollToJourney";
 import Reveal from "@/components/Reveal";
 import { chapters } from "@/lib/qfinance-chapters";
 
@@ -18,7 +19,7 @@ export default function BeginnerJourneyMapPage() {
       <QFinanceHeader />
 
       {/* Beginner Journey introduction */}
-      <section className="border-b border-[var(--qf-line)] px-6 py-12 sm:py-14">
+      <section className="relative border-b border-[var(--qf-line)] px-6 py-12 pb-20 sm:py-14 sm:pb-20">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
             <p className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
@@ -46,10 +47,15 @@ export default function BeginnerJourneyMapPage() {
             </div>
           </Reveal>
         </div>
+
+        <ScrollToJourney />
       </section>
 
       {/* Journey timeline */}
-      <section className="px-6 py-12 sm:py-16">
+      <section
+        id="journey"
+        className="scroll-mt-6 px-6 py-12 sm:py-16"
+      >
         <div className="mx-auto max-w-xl">
           <Reveal>
             <JourneyTimeline chapters={chapters} />
