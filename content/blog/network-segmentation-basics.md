@@ -16,4 +16,4 @@ Segmentation splits your network into zones (VLANs) based on function and trust 
 
 ## Where to start
 
-You don't need to redesign everything at once. Start with the highest-value split: separate anything that holds sensitive data (servers, databases, backups) from everything else. From there, layer in guest network isolation and IoT segmentation as your setup matures.
+You Don&apos;t need to redesign everything at once. Start with the highest-value split: separate anything that holds sensitive data (servers, databases, backups) from everything else. From there, layer in guest network isolation and IoT segmentation as your setup matures.

@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     console.warn("Qbids registration: DATABASE_URL not set — skipping persistence, email only.");
   }
 
-  // Already registered — don't notify by email again, just confirm to the user.
+  // Already registered — Don&apos;t notify by email again, just confirm to the user.
   if (duplicate) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     console.error("Qbids registration email error:", result.error);
     // The registration is already saved in the DB at this point (if configured),
-    // so we don't want to fail the whole request just because the notification
+    // so we Don&apos;t want to fail the whole request just because the notification
     // email didn't send — that would be misleading to the person signing up.
     if (!isDbConfigured()) {
       return NextResponse.json(

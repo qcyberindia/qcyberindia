@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Archived, inert code (see /_archive/qfinance-sketchflow) — kept on
+    // disk per prior QFinance direction change, not part of the build.
+    "_archive/**",
   ]),
 ]);
 

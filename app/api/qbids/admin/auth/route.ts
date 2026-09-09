@@ -1,40 +1,21 @@
-import { NextRequest, NextResponse } from "next/server";
-import {
-  QBIDS_ADMIN_COOKIE,
-  QBIDS_ADMIN_MAX_AGE_SECONDS,
-  createAdminCookieValue,
-} from "@/lib/qbids-admin-auth";
+import { NextResponse } from "next/server";
 
-export async function POST(req: NextRequest) {
-  const adminPassword = process.env.QBIDS_ADMIN_PASSWORD;
+// Retired. This endpoint used to be an independent Qbids-only login,
+// separate from the centralized QCyberIndia Admin auth. There is now only
+// one admin login system: POST /api/admin/auth (see lib/admin-auth.ts).
+// This route is kept in place (rather than removed) only so that anything
+// still pointing at the old URL gets a clear, honest answer instead of a
+// generic 404 - it can no longer check a password or issue a session
+// under any circumstance.
+const RETIRED_RESPONSE = {
+  ok: false,
+  error: "This endpoint has been retired. Use POST /api/admin/auth instead.",
+};
 
-  if (!adminPassword) {
-    return NextResponse.json(
-      { ok: false, error: "Admin access isn't configured yet (QBIDS_ADMIN_PASSWORD missing)." },
-      { status: 503 }
-    );
-  }
-
-  const { password } = await req.json().catch(() => ({ password: "" }));
-
-  if (typeof password !== "string" || password !== adminPassword) {
-    return NextResponse.json({ ok: false, error: "Incorrect password" }, { status: 401 });
-  }
-
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(QBIDS_ADMIN_COOKIE, createAdminCookieValue(adminPassword), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: QBIDS_ADMIN_MAX_AGE_SECONDS,
-    path: "/",
-  });
-
-  return res;
+export async function POST() {
+  return NextResponse.json(RETIRED_RESPONSE, { status: 410 });
 }
 
 export async function DELETE() {
-  const res = NextResponse.json({ ok: true });
-  res.cookies.delete(QBIDS_ADMIN_COOKIE);
-  return res;
+  return NextResponse.json(RETIRED_RESPONSE, { status: 410 });
 }

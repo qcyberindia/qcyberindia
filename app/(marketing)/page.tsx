@@ -62,7 +62,7 @@ export default function HomePage() {
     </h2>
 
     <p className="mt-6 text-lg leading-8 text-[var(--color-fog)]">
-      We don't sell isolated IT services. We take complete ownership of your
+      We don&apos;t sell isolated IT services. We take complete ownership of your
       technology environment—from cloud infrastructure and cybersecurity to
       networking, business applications, websites, and day-to-day IT support.
       One trusted partner. One accountable team. Zero vendor confusion.

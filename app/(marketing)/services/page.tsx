@@ -16,7 +16,7 @@ export default function ServicesPage() {
       <PageHeader
         eyebrow="Services"
         title="The capabilities behind each solution"
-        description="You don't need to know what's running behind the scenes — that's the point of working with one accountable partner. But if you want the detail, here's exactly what we manage."
+        description="You Don&apos;t need to know what's running behind the scenes — that's the point of working with one accountable partner. But if you want the detail, here's exactly what we manage."
         maxWidth="max-w-2xl"
       />
 

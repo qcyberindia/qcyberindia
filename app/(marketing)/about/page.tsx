@@ -11,7 +11,7 @@ export default function AboutPage() {
     <div className="mx-auto max-w-3xl px-6 py-16">
       <PageHeader
         eyebrow="About"
-        title="The IT department you don't have to hire, manage, or worry about"
+        title="The IT department you Don&apos;t have to hire, manage, or worry about"
         maxWidth="max-w-none"
       />
       <div className="mt-8 space-y-5 text-[var(--color-fog)] leading-relaxed">

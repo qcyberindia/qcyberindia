@@ -16,7 +16,7 @@ export default function SolutionsPage() {
     <div className="mx-auto max-w-6xl px-6 py-16">
       <PageHeader
         eyebrow="Solutions"
-        title="We don't sell technology. We take ownership of it."
+        title="We Don&apos;t sell technology. We take ownership of it."
         description={
           <>You shouldn&apos;t need to know what&apos;s running behind the scenes to trust that it&apos;s handled.
           Here&apos;s what &quot;{siteConfig.promise}&quot; actually covers.</>

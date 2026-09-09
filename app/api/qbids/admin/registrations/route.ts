@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getQbidsRegistrations, updateQbidsRegistrationStatus, isDbConfigured } from "@/lib/db";
-import { isValidAdminCookie, QBIDS_ADMIN_COOKIE } from "@/lib/qbids-admin-auth";
+import { isValidAdminCookie, ADMIN_COOKIE } from "@/lib/admin-auth";
 
 function requireAdmin(req: NextRequest): boolean {
-  return isValidAdminCookie(req.cookies.get(QBIDS_ADMIN_COOKIE)?.value);
+  return isValidAdminCookie(req.cookies.get(ADMIN_COOKIE)?.value);
 }
 
 export async function GET(req: NextRequest) {

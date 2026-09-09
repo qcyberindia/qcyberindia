@@ -12,7 +12,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   compress: true,
-  poweredByHeader: false, // don't advertise "X-Powered-By: Next.js"
+  poweredByHeader: false, // Don&apos;t advertise "X-Powered-By: Next.js"
   images: {
     // Screenshots in /public/qbids are large PNGs (250–530KB each).
     // Next's image optimizer re-encodes them to modern formats on request

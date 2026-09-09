@@ -181,7 +181,7 @@ export const serviceCategories: ServiceCategory[] = [
       },
       {
         name: "License & Vendor Management",
-        description: "We track your renewals, licenses, and vendor relationships so nothing lapses quietly and nobody overpays for seats you don't use.",
+        description: "We track your renewals, licenses, and vendor relationships so nothing lapses quietly and nobody overpays for seats you Don&apos;t use.",
       },
       {
         name: "Application Hosting",
