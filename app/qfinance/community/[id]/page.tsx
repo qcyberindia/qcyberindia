@@ -74,7 +74,7 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
 
             <div className="mt-2.5 flex items-center gap-3 text-[13px] text-[var(--qf-ink-soft)]">
               <span>{post.author_display_name}</span>
-              <span aria-hidden>\u00b7</span>
+              <span aria-hidden>·</span>
               <span>{formatDate(post.created_at)}</span>
             </div>
 
@@ -101,9 +101,9 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
                   </p>
                   <div className="mt-2 flex items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
                     <span>{reply.author_display_name}</span>
-                    <span aria-hidden>\u00b7</span>
+                    <span aria-hidden>·</span>
                     <span>{formatDate(reply.created_at)}</span>
-                    <span aria-hidden>\u00b7</span>
+                    <span aria-hidden>·</span>
                     <ReportButton targetType="reply" targetId={reply.id} />
                   </div>
                 </div>
