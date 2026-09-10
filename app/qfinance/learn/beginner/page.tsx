@@ -36,14 +36,56 @@ export default function BeginnerJourneyMapPage() {
             </p>
 
             <div
-              className="mt-5 flex items-center justify-center gap-3 text-sm font-medium text-[var(--qf-ink-soft)]"
+              className="mx-auto mt-8 w-full max-w-2xl"
               aria-label="Journey from fear to understanding to confidence"
             >
-              <span>Fear</span>
-              <ArrowLine />
-              <span>Understanding</span>
-              <ArrowLine />
-              <span className="text-[var(--qf-brass-dark)]">Confidence</span>
+              <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-start">
+                <div className="text-center">
+                  <div className="text-[10px] font-medium tracking-[0.16em] text-[var(--qf-ink-muted)]">
+                    01
+                  </div>
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--qf-ink-soft)]">
+                    Fear
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--qf-ink-muted)]">
+                    What feels uncertain
+                  </p>
+                </div>
+
+                <div
+                  aria-hidden="true"
+                  className="mt-4 h-px w-8 bg-[var(--qf-line)] sm:w-12"
+                />
+
+                <div className="text-center">
+                  <div className="text-[10px] font-medium tracking-[0.16em] text-[var(--qf-ink-muted)]">
+                    02
+                  </div>
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--qf-ink-soft)]">
+                    Understanding
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--qf-ink-muted)]">
+                    What starts making sense
+                  </p>
+                </div>
+
+                <div
+                  aria-hidden="true"
+                  className="mt-4 h-px w-8 bg-[var(--qf-line)] sm:w-12"
+                />
+
+                <div className="text-center">
+                  <div className="text-[10px] font-medium tracking-[0.16em] text-[var(--qf-brass-dark)]">
+                    03
+                  </div>
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--qf-brass-dark)]">
+                    Confidence
+                  </div>
+                  <p className="mt-1 text-[11px] leading-relaxed text-[var(--qf-ink-muted)]">
+                    What you can now do
+                  </p>
+                </div>
+              </div>
             </div>
           </Reveal>
         </div>
@@ -65,14 +107,5 @@ export default function BeginnerJourneyMapPage() {
 
       <QFinanceFooter />
     </div>
-  );
-}
-
-function ArrowLine() {
-  return (
-    <span
-      aria-hidden="true"
-      className="h-px w-6 bg-[var(--qf-line)]"
-    />
   );
 }

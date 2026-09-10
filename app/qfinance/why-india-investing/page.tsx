@@ -89,17 +89,126 @@ function OldVsNew() {
 }
 
 function EmotionalCycle() {
-  const steps = ["Price rises", "Excitement", "FOMO", "Buy", "Price falls", "Panic", "Sell"];
   return (
-    <div className="flex flex-wrap items-center gap-x-2 gap-y-3">
-      {steps.map((s, i) => (
-        <span key={s} className="flex items-center gap-2">
-          <span className="rounded-full border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--qf-ink)]">
-            {s}
-          </span>
-          {i < steps.length - 1 && <ArrowRight size={13} className="text-[var(--qf-ink-soft)]" />}
+    <div className="rounded-2xl border border-[var(--qf-line)] bg-[var(--qf-surface)] p-5 sm:p-6">
+      <div className="flex items-center justify-between border-b border-[var(--qf-line)] pb-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--qf-ink-soft)]">
+            The emotional loop
+          </p>
+          <p className="mt-1 text-[12px] text-[var(--qf-ink-soft)]">
+            How a price move can become an emotional decision
+          </p>
+        </div>
+
+        <span
+          aria-hidden="true"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-[var(--qf-line)] text-sm text-[var(--qf-brass-dark)]"
+        >
+          ↻
         </span>
-      ))}
+      </div>
+
+      <div className="mt-6 space-y-5">
+        <div className="grid grid-cols-[1fr_auto_1fr_auto_1fr] items-center gap-2 sm:gap-4">
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Market
+            </p>
+            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+              Price rises
+            </p>
+          </div>
+
+          <span aria-hidden="true" className="text-[var(--qf-brass-dark)]">
+            →
+          </span>
+
+          <div className="text-center">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Feeling
+            </p>
+            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+              Excitement
+            </p>
+          </div>
+
+          <span aria-hidden="true" className="text-[var(--qf-brass-dark)]">
+            →
+          </span>
+
+          <div className="text-right">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Feeling
+            </p>
+            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+              FOMO
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="h-px flex-1 bg-[var(--qf-line)]" />
+          <span className="text-[9px] font-semibold uppercase tracking-[0.16em] text-[var(--qf-ink-soft)]">
+            Leads to
+          </span>
+          <div className="h-px flex-1 bg-[var(--qf-line)]" />
+        </div>
+
+        <div className="flex items-center justify-center gap-4">
+          <div className="rounded-xl border border-[var(--qf-brass-dark)] bg-[var(--qf-cream-1)] px-6 py-3 text-center">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
+              Decision
+            </p>
+            <p className="mt-1 text-[18px] font-semibold text-[var(--qf-ink)]">
+              Buy
+            </p>
+          </div>
+
+          <span aria-hidden="true" className="text-lg text-[var(--qf-brass-dark)]">
+            ↓
+          </span>
+
+          <div className="rounded-xl border border-[var(--qf-line)] px-6 py-3 text-center">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Later
+            </p>
+            <p className="mt-1 text-[18px] font-semibold text-[var(--qf-ink)]">
+              Price falls
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3 sm:gap-6">
+          <div>
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Feeling
+            </p>
+            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+              Panic
+            </p>
+          </div>
+
+          <span aria-hidden="true" className="text-[var(--qf-brass-dark)]">
+            →
+          </span>
+
+          <div className="text-right">
+            <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
+              Decision
+            </p>
+            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-brass-dark)]">
+              Sell
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 border-t border-[var(--qf-line)] pt-4 text-center">
+        <p className="text-[12px] leading-5 text-[var(--qf-ink-soft)]">
+          The market moves. Our emotions often move with it.
+        </p>
+      </div>
     </div>
   );
 }
