@@ -115,7 +115,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Market
             </p>
-            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[18px] font-semibold text-[var(--qf-ink)]">
               Price rises
             </p>
           </div>
@@ -128,7 +128,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Feeling
             </p>
-            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[18px] font-semibold text-[var(--qf-ink)]">
               Excitement
             </p>
           </div>
@@ -141,7 +141,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Feeling
             </p>
-            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[18px] font-semibold text-[var(--qf-ink)]">
               FOMO
             </p>
           </div>
@@ -160,12 +160,15 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
               Decision
             </p>
-            <p className="mt-1 text-[18px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[20px] font-semibold text-[var(--qf-ink)]">
               Buy
             </p>
           </div>
 
-          <span aria-hidden="true" className="text-lg text-[var(--qf-brass-dark)]">
+          <span
+            aria-hidden="true"
+            className="text-lg text-[var(--qf-brass-dark)]"
+          >
             ↓
           </span>
 
@@ -173,7 +176,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Later
             </p>
-            <p className="mt-1 text-[18px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[20px] font-semibold text-[var(--qf-ink)]">
               Price falls
             </p>
           </div>
@@ -184,7 +187,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Feeling
             </p>
-            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-ink)]">
+            <p className="mt-1 font-serif text-[18px] font-semibold text-[var(--qf-ink)]">
               Panic
             </p>
           </div>
@@ -197,7 +200,7 @@ function EmotionalCycle() {
             <p className="text-[9px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-ink-soft)]">
               Decision
             </p>
-            <p className="mt-1 text-[16px] font-semibold text-[var(--qf-brass-dark)]">
+            <p className="mt-1 font-serif text-[18px] font-semibold text-[var(--qf-brass-dark)]">
               Sell
             </p>
           </div>
