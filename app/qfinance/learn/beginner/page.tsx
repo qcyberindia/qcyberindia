@@ -48,7 +48,7 @@ export default function BeginnerJourneyMapPage() {
           </Reveal>
         </div>
 
-        <ScrollToJourney />
+        <ScrollToJourney targetId="journey" label="Scroll to begin" />
       </section>
 
       {/* Journey timeline */}

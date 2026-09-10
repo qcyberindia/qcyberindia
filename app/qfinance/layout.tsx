@@ -84,6 +84,19 @@ export default function QFinanceLayout({
       />
 
       <style>{`
+        @keyframes qf-scroll-arrow {
+          0%,
+          100% {
+            transform: translateY(-1px);
+            opacity: 0.65;
+          }
+
+          50% {
+            transform: translateY(3px);
+            opacity: 1;
+          }
+        }
+
         .qf-font-display,
         .font-display {
           font-family:

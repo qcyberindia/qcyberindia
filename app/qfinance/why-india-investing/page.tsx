@@ -6,6 +6,7 @@ import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import CampaignSection from "@/components/qfinance/campaign/CampaignSection";
 import ConceptReveal from "@/components/qfinance/learning/ConceptReveal";
 import Reveal from "@/components/Reveal";
+import ScrollToJourney from "@/components/qfinance/learning/ScrollToJourney";
 
 export const metadata: Metadata = {
   title: "Why Is India Investing? | QFinance",
@@ -136,7 +137,7 @@ export default function WhyIndiaInvestingPage() {
       <QFinanceHeader />
 
       {/* Moment 1 — The old belief */}
-      <section className="px-6 py-20 sm:py-28">
+      <section className="relative px-6 py-20 pb-28 sm:py-28 sm:pb-36">
         <div className="mx-auto max-w-xl text-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
@@ -155,16 +156,25 @@ export default function WhyIndiaInvestingPage() {
             </p>
           </Reveal>
         </div>
+
+        <ScrollToJourney targetId="campaign-start" label="Continue the story" />
       </section>
 
       {/* Moment 2 — The shift */}
-      <CampaignSection
-        moment="01"
-        eyebrow="The shift"
-        headline="A new generation started looking at investing differently."
-        visual={<Smartphone size={36} strokeWidth={1.3} className="text-[var(--qf-brass)]" />}
-        tone="tinted"
-      >
+      <div id="campaign-start" className="scroll-mt-6">
+        <CampaignSection
+          moment="01"
+          eyebrow="The shift"
+          headline="A new generation started looking at investing differently."
+          visual={
+            <Smartphone
+              size={36}
+              strokeWidth={1.3}
+              className="text-[var(--qf-brass)]"
+            />
+          }
+          tone="tinted"
+        >
         <p>
           Younger investors grew up with smartphones already in hand. Mutual funds, ETFs, and SIPs
           stopped being things explained only by a bank relationship manager — they became things
@@ -175,6 +185,8 @@ export default function WhyIndiaInvestingPage() {
           has grown substantially, but still represents a minority of India&apos;s population.
         </p>
       </CampaignSection>
+
+      </div>
 
       {/* Moment 3 — Access became easier */}
       <CampaignSection moment="02" eyebrow="Access" headline="Opening an account used to take days. Now it takes minutes.">
