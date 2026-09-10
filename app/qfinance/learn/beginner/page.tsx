@@ -19,7 +19,7 @@ export default function BeginnerJourneyMapPage() {
       <QFinanceHeader />
 
       {/* Beginner Journey introduction */}
-      <section className="relative border-b border-[var(--qf-line)] px-6 py-12 pb-20 sm:py-14 sm:pb-20">
+      <section className="border-b border-[var(--qf-line)] px-6 py-12 pb-10 sm:py-14 sm:pb-12">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
             <p className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
@@ -48,7 +48,7 @@ export default function BeginnerJourneyMapPage() {
           </Reveal>
         </div>
 
-        <ScrollToJourney targetId="journey" label="Scroll to begin" />
+        <ScrollToJourney targetId="journey" label="Begin the journey" />
       </section>
 
       {/* Journey timeline */}

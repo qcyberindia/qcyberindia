@@ -137,7 +137,7 @@ export default function WhyIndiaInvestingPage() {
       <QFinanceHeader />
 
       {/* Moment 1 — The old belief */}
-      <section className="relative px-6 py-20 pb-28 sm:py-28 sm:pb-36">
+      <section className="px-6 py-20 pb-12 sm:py-28 sm:pb-16">
         <div className="mx-auto max-w-xl text-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
