@@ -107,11 +107,11 @@ export async function POST(req: NextRequest) {
   const result = await sendEmail({
     to: user.email,
     from: `noreply@${qfinanceConfig.domain}`,
-    subject: "Sign in to QFinance Community",
+    subject: "Sign in to QFinera Community",
     text: [
       `Hi ${user.display_name},`,
       "",
-      "Click the link below to sign in to QFinance Community. It expires in 15 minutes.",
+      "Click the link below to sign in to QFinera Community. It expires in 15 minutes.",
       "",
       verifyUrl,
       "",

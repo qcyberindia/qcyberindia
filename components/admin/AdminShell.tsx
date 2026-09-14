@@ -8,7 +8,7 @@ import { Lock, RefreshCw, LogOut, LayoutDashboard, Building2, Landmark } from "l
 const NAV = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/qbids", label: "Qbids", icon: Building2 },
-  { href: "/admin/qfinance", label: "QFinance", icon: Landmark },
+  { href: "/admin/qfinance", label: "QFinera", icon: Landmark },
 ];
 
 const inputBase =
@@ -92,7 +92,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
               QCyberIndia Admin
             </p>
             <p className="mt-1 font-display text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--color-fog)]">
-              Qbids &amp; QFinance registrations
+              Qbids &amp; QFinera registrations
             </p>
           </div>
 
