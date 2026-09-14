@@ -9,7 +9,7 @@ function getRoot() {
   return typeof document === "undefined" ? null : document.getElementById("qf-root");
 }
 
-// The blocking init script in app/qfinance/layout.tsx is the single source
+// The blocking init script in app/qfinera/layout.tsx is the single source
 // of truth for the resolved theme (localStorage["qf-theme"], falling back to
 // system preference) — it sets #qf-root[data-qf-theme] before first paint.
 // ThemeToggle doesn't run a second initialization; it just reads that

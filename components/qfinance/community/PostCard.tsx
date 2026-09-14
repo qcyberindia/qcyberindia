@@ -15,7 +15,7 @@ function timeAgo(dateStr: string) {
 export default function PostCard({ post }: { post: QFinancePost }) {
   return (
     <Link
-      href={`/qfinance/community/${post.id}`}
+      href={`/qfinera/community/${post.id}`}
       className="block rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-colors hover:border-[var(--qf-brass)]"
     >
       <div className="flex items-center gap-2">

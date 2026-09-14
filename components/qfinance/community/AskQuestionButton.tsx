@@ -44,7 +44,7 @@ function ComposerForm({ onClose }: { onClose: () => void }) {
         setSubmitting(false);
         return;
       }
-      router.push(`/qfinance/community/${json.id}`);
+      router.push(`/qfinera/community/${json.id}`);
     } catch {
       setError("Something went wrong. Please try again.");
       setSubmitting(false);

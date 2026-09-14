@@ -9,13 +9,13 @@ export default function QFinanceFooter() {
           © {new Date().getFullYear()} {qfinanceConfig.name}, by QCyberIndia
         </p>
         <div className="flex items-center gap-5">
-          <Link href="/qfinance/learn/beginner" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+          <Link href="/qfinera/learn/beginner" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
             Learn
           </Link>
-          <Link href="/qfinance/community" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+          <Link href="/qfinera/community" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
             Community
           </Link>
-          <Link href="/qfinance/about" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+          <Link href="/qfinera/about" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
             About
           </Link>
         </div>

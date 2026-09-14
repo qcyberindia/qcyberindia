@@ -17,7 +17,7 @@ export const qfinanceConfig = {
   /** Prior public name — kept only for reference/compatibility copy
    * ("formerly QFinance"), never shown as the primary brand. */
   legacyName: "QFinance",
-  path: "/qfinance",
+  path: "/qfinera",
   domain: siteConfig.domain,
   appUrl:
     process.env.QFINANCE_APP_URL ??

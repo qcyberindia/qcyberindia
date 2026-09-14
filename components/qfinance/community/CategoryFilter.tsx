@@ -17,7 +17,7 @@ export default function CategoryFilter({ active }: { active?: string }) {
   return (
     <div className="flex flex-wrap gap-2">
       <Link
-        href="/qfinance/community"
+        href="/qfinera/community"
         className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors ${
           !active
             ? "border-[var(--qf-brass)] bg-[var(--qf-brass)]/10 text-[var(--qf-brass-dark)]"
@@ -29,7 +29,7 @@ export default function CategoryFilter({ active }: { active?: string }) {
       {CATEGORIES.map((c) => (
         <Link
           key={c}
-          href={`/qfinance/community?category=${encodeURIComponent(c)}`}
+          href={`/qfinera/community?category=${encodeURIComponent(c)}`}
           className={`rounded-full border px-3 py-1.5 text-[13px] font-medium transition-colors ${
             active === c
               ? "border-[var(--qf-brass)] bg-[var(--qf-brass)]/10 text-[var(--qf-brass-dark)]"

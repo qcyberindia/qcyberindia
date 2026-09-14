@@ -69,7 +69,7 @@ export default function PostOwnerControls({
         setDeleting(false);
         return;
       }
-      router.push("/qfinance/community");
+      router.push("/qfinera/community");
     } catch {
       setError("Something went wrong.");
       setDeleting(false);

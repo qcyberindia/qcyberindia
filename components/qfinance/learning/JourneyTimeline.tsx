@@ -136,7 +136,7 @@ export default function JourneyTimeline({
                 }`}
               >
                 <Link
-                  href={`/qfinance/learn/beginner/${chapter.slug}`}
+                  href={`/qfinera/learn/beginner/${chapter.slug}`}
                   className={`group block rounded-md border p-5 sm:p-6 transition-colors ${
                     isCurrent
                       ? "border-[var(--qf-brass)] bg-[var(--qf-cream-1)]"
