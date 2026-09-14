@@ -24,7 +24,7 @@ export default function PostCard({ post }: { post: QFinancePost }) {
         </span>
         {post.is_seed && (
           <span className="rounded-full border border-[var(--qf-brass)]/40 bg-[var(--qf-brass)]/10 px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--qf-brass-dark)]">
-            QFinance Starter Discussion
+            QFinera Starter Discussion
           </span>
         )}
       </div>

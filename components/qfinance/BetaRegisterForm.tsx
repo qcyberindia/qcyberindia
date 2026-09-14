@@ -55,7 +55,7 @@ export default function BetaRegisterForm() {
         <p className="mt-2 text-[15px] leading-relaxed text-[var(--qf-ink-soft)]">
           {status === "duplicate"
             ? "This email is already registered — no need to sign up again."
-            : "We'll email you when QFinance beta access opens. In the meantime, the Beginner Journey is already live and free."}
+            : "We'll email you when QFinera beta access opens. In the meantime, the Beginner Journey is already live and free."}
         </p>
       </div>
     );
@@ -102,7 +102,7 @@ export default function BetaRegisterForm() {
       </button>
 
       <p className="text-xs text-[var(--qf-ink-soft)]">
-        We&apos;ll only use this to contact you about QFinance beta access. No spam.
+        We&apos;ll only use this to contact you about QFinera beta access. No spam.
       </p>
     </form>
   );

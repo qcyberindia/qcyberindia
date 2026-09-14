@@ -9,12 +9,12 @@ import Reveal from "@/components/Reveal";
 import ScrollToJourney from "@/components/qfinance/learning/ScrollToJourney";
 
 export const metadata: Metadata = {
-  title: "Why Is India Investing? | QFinance",
+  title: "Why Is India Investing? | QFinera",
   description:
     "Something changed in how Indians think about the stock market. A short, honestly-sourced look at why — and what it means before you invest.",
   alternates: { canonical: "/qfinance/why-india-investing" },
   openGraph: {
-    title: "Why Is India Investing? | QFinance",
+    title: "Why Is India Investing? | QFinera",
     description:
       "Something changed in how Indians think about the stock market. A short, honestly-sourced look at why.",
     url: "/qfinance/why-india-investing",
@@ -434,7 +434,7 @@ export default function WhyIndiaInvestingPage() {
                 href="/qfinance/community"
                 className="inline-flex items-center gap-1.5 font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline"
               >
-                Join the QFinance Community
+                Join the QFinera Community
               </Link>
             </div>
           </Reveal>
@@ -457,7 +457,7 @@ export default function WhyIndiaInvestingPage() {
                 <li>
                   These are fast-moving monthly figures, current as of this page&apos;s last research
                   pass (8 September 2026) — not fixed facts. Sources are maintained and reviewed
-                  as part of QFinance&apos;s ongoing research process.
+                  as part of QFinera&apos;s ongoing research process.
                 </li>
               </ul>
             </ConceptReveal>

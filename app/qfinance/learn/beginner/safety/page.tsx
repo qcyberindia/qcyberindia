@@ -133,7 +133,7 @@ export default function ChapterSafetyPage() {
             Still confused?
           </p>
           <p className="mt-1.5 font-display text-[15px] font-semibold text-[var(--qf-ink)]">
-            Ask the QFinance community.
+            Ask the QFinera community.
           </p>
           <Link
             href="/qfinance/community"

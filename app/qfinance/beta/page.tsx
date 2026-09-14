@@ -6,7 +6,7 @@ import Reveal from "@/components/Reveal";
 
 export const metadata: Metadata = {
   title: "Join the Beta",
-  description: "Register for early QFinance beta access.",
+  description: "Register for early QFinera beta access.",
   alternates: { canonical: "/qfinance/beta" },
 };
 
@@ -18,7 +18,7 @@ export default function BetaPage() {
         <div className="mx-auto max-w-md">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
-              QFinance Beta
+              QFinera Beta
             </p>
             <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-4xl">
               Join the Beta

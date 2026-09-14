@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
 
   if (!adminPassword) {
     return NextResponse.json(
-      { ok: false, error: "Admin access isn't configured yet (QBIDS_ADMIN_PASSWORD missing)." },
+      { ok: false, error: "QCyberIndia admin authentication isn't configured yet (QCYBERINDIA_ADMIN_PASSWORD missing)." },
       { status: 503 }
     );
   }

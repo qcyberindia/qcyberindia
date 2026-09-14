@@ -75,7 +75,7 @@ export default function ChapterNextStepPage() {
       <LearningSection eyebrow="What this journey was not" question="">
         <p>
           Nothing in these eight chapters told you what to buy, when to buy it, or what kind of return to
-          expect. That was deliberate. QFinance is educational — understanding how the mechanics work is a
+          expect. That was deliberate. QFinera is educational — understanding how the mechanics work is a
           separate thing from deciding what, if anything, you personally should invest in, and that decision
           depends on your own circumstances, goals, and risk tolerance.
         </p>
@@ -89,7 +89,7 @@ export default function ChapterNextStepPage() {
               Still have a question?
             </p>
             <p className="mt-1.5 text-[13.5px] text-[var(--qf-ink-soft)]">
-              Ask it in the QFinance community — other beginners are asking the same things.
+              Ask it in the QFinera community — other beginners are asking the same things.
             </p>
             <Link
               href="/qfinance/community"
@@ -105,7 +105,7 @@ export default function ChapterNextStepPage() {
               Want to help shape what&apos;s next?
             </p>
             <p className="mt-1.5 text-[13.5px] text-[var(--qf-ink-soft)]">
-              QFinance is still early. Join the beta to get access as new tools are built.
+              QFinera is still early. Join the beta to get access as new tools are built.
             </p>
             <Link
               href="/qfinance/beta"

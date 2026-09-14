@@ -23,13 +23,13 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: `${qfinanceConfig.name} — Understand First. Invest Second.`,
+    default: `${qfinanceConfig.name} — ${qfinanceConfig.tagline}`,
     template: `%s | ${qfinanceConfig.name}`,
   },
   description: qfinanceConfig.description,
   alternates: { canonical: qfinanceConfig.path },
   openGraph: {
-    title: `${qfinanceConfig.name} — Understand First. Invest Second.`,
+    title: `${qfinanceConfig.name} — ${qfinanceConfig.tagline}`,
     description: qfinanceConfig.description,
     url: qfinanceConfig.path,
     siteName: qfinanceConfig.name,
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: `${qfinanceConfig.name} — Understand First. Invest Second.`,
+    title: `${qfinanceConfig.name} — ${qfinanceConfig.tagline}`,
     description: qfinanceConfig.description,
   },
 };

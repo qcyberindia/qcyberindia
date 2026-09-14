@@ -282,6 +282,10 @@ export type QFinancePost = {
   is_seed: boolean;
   created_at: string;
   author_display_name: string;
+  /** Server-side only — used to compute an `isOwner` boolean before
+   * rendering; never send this raw value to the client (see doc's privacy
+   * requirement: don't expose internal user IDs in the UI). */
+  author_id: number;
   reply_count: number;
 };
 
@@ -338,6 +342,8 @@ export type QFinanceReply = {
   status: string;
   created_at: string;
   author_display_name: string;
+  /** Server-side only, same reasoning as QFinancePost.author_id. */
+  author_id: number;
 };
 
 // Returns null if the post doesn't exist or isn't publicly visible
@@ -352,7 +358,7 @@ export async function getQFinanceCommunityPost(
   await ensureQFinanceCommunityTables();
 
   const postRes = await p.query(
-    `SELECT p.id, p.title, p.body, p.category, p.status, p.is_seed, p.created_at,
+    `SELECT p.id, p.title, p.body, p.category, p.status, p.is_seed, p.created_at, p.author_id,
             u.display_name AS author_display_name,
             (SELECT COUNT(*)::int FROM qfinance_community_replies r WHERE r.post_id = p.id AND r.status = 'published') AS reply_count
      FROM qfinance_community_posts p
@@ -364,7 +370,7 @@ export async function getQFinanceCommunityPost(
   if (!post) return null;
 
   const repliesRes = await p.query(
-    `SELECT r.id, r.body, r.status, r.created_at, u.display_name AS author_display_name
+    `SELECT r.id, r.body, r.status, r.created_at, r.author_id, u.display_name AS author_display_name
      FROM qfinance_community_replies r
      JOIN qfinance_users u ON u.id = r.author_id
      WHERE r.post_id = $1 AND r.status = 'published'
@@ -453,6 +459,121 @@ export async function createQFinanceCommunityReply(input: {
 }
 
 export type ReportReason = "spam" | "scam" | "harassment" | "misleading_claim" | "personal_info" | "other";
+
+// --- Owner-managed edit/delete for posts and replies ----------------------
+// Ownership is always re-fetched from the database and compared to the
+// server-verified session id passed in by the caller (an API route) —
+// never trusted from the request body. Soft-delete (status = 'removed')
+// rather than a hard DELETE, consistent with the existing moderation model
+// (see ensureQFinanceCommunityTables' status CHECK) — a member deleting
+// their own post shouldn't behave differently, at the data layer, from a
+// moderator removing it. This also means a reply thread's structure stays
+// intact even after a post is "deleted" by its author.
+
+export async function getQFinancePostAuthorId(id: number): Promise<number | null> {
+  const p = getPool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    `SELECT author_id FROM qfinance_community_posts WHERE id = $1 AND status != 'removed'`,
+    [id]
+  );
+  return rows[0]?.author_id ?? null;
+}
+
+export async function getQFinanceReplyAuthorId(id: number): Promise<number | null> {
+  const p = getPool();
+  if (!p) return null;
+  const { rows } = await p.query(
+    `SELECT author_id FROM qfinance_community_replies WHERE id = $1 AND status != 'removed'`,
+    [id]
+  );
+  return rows[0]?.author_id ?? null;
+}
+
+export async function updateOwnQFinanceCommunityPost(
+  id: number,
+  authorId: number,
+  input: { title: string; body: string }
+): Promise<{ ok: boolean; error?: string }> {
+  const p = getPool();
+  if (!p) return { ok: false, error: "Database is not configured." };
+
+  const title = input.title.trim().slice(0, MAX_TITLE_LEN);
+  const body = input.body.trim().slice(0, MAX_BODY_LEN);
+  if (!title || !body) return { ok: false, error: "Title and question are required." };
+
+  // The WHERE clause itself enforces ownership — an UPDATE that matches
+  // zero rows (wrong owner, or post already removed) is indistinguishable
+  // at the SQL level from "nothing to update", which is exactly the
+  // behavior we want: no row leaks whether it existed for the wrong user.
+  const { rowCount } = await p.query(
+    `UPDATE qfinance_community_posts
+     SET title = $1, body = $2, updated_at = now()
+     WHERE id = $3 AND author_id = $4 AND status = 'published'`,
+    [title, body, id, authorId]
+  );
+
+  if (rowCount === 0) return { ok: false, error: "Post not found or you don't have permission to edit it." };
+  return { ok: true };
+}
+
+export async function softDeleteOwnQFinanceCommunityPost(
+  id: number,
+  authorId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const p = getPool();
+  if (!p) return { ok: false, error: "Database is not configured." };
+
+  const { rowCount } = await p.query(
+    `UPDATE qfinance_community_posts
+     SET status = 'removed', updated_at = now()
+     WHERE id = $1 AND author_id = $2 AND status = 'published'`,
+    [id, authorId]
+  );
+
+  if (rowCount === 0) return { ok: false, error: "Post not found or you don't have permission to delete it." };
+  return { ok: true };
+}
+
+export async function updateOwnQFinanceCommunityReply(
+  id: number,
+  authorId: number,
+  body: string
+): Promise<{ ok: boolean; error?: string }> {
+  const p = getPool();
+  if (!p) return { ok: false, error: "Database is not configured." };
+
+  const trimmedBody = body.trim().slice(0, MAX_BODY_LEN);
+  if (!trimmedBody) return { ok: false, error: "Reply can't be empty." };
+
+  const { rowCount } = await p.query(
+    `UPDATE qfinance_community_replies
+     SET body = $1, updated_at = now()
+     WHERE id = $2 AND author_id = $3 AND status = 'published'`,
+    [trimmedBody, id, authorId]
+  );
+
+  if (rowCount === 0) return { ok: false, error: "Reply not found or you don't have permission to edit it." };
+  return { ok: true };
+}
+
+export async function softDeleteOwnQFinanceCommunityReply(
+  id: number,
+  authorId: number
+): Promise<{ ok: boolean; error?: string }> {
+  const p = getPool();
+  if (!p) return { ok: false, error: "Database is not configured." };
+
+  const { rowCount } = await p.query(
+    `UPDATE qfinance_community_replies
+     SET status = 'removed', updated_at = now()
+     WHERE id = $1 AND author_id = $2 AND status = 'published'`,
+    [id, authorId]
+  );
+
+  if (rowCount === 0) return { ok: false, error: "Reply not found or you don't have permission to delete it." };
+  return { ok: true };
+}
 
 export async function createQFinanceCommunityReport(input: {
   reporterId: number;

@@ -53,7 +53,7 @@ export default function AdminOverviewPage() {
           )}
           <div className="mt-6 grid grid-cols-2 gap-4 sm:max-w-md">
             <AdminStat label="Qbids registrations" value={data.qbids} icon={Building2} href="/admin/qbids" />
-            <AdminStat label="QFinance registrations" value={data.qfinance} icon={Landmark} href="/admin/qfinance" />
+            <AdminStat label="QFinera registrations" value={data.qfinance} icon={Landmark} href="/admin/qfinance" />
           </div>
         </>
       )}

@@ -8,6 +8,8 @@ import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import CommunityScope from "@/components/qfinance/community/CommunityScope";
 import ReplyForm from "@/components/qfinance/community/ReplyForm";
 import ReportButton from "@/components/qfinance/community/ReportButton";
+import PostOwnerControls from "@/components/qfinance/community/PostOwnerControls";
+import ReplyOwnerControls from "@/components/qfinance/community/ReplyOwnerControls";
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
@@ -63,7 +65,7 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
               </span>
               {post.is_seed && (
                 <span className="rounded-full border border-[var(--qf-brass)]/40 bg-[var(--qf-brass)]/10 px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--qf-brass-dark)]">
-                  QFinance Starter Discussion
+                  QFinera Starter Discussion
                 </span>
               )}
             </div>
@@ -82,9 +84,10 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
               {post.body}
             </p>
 
-            <div className="mt-4">
+            <div className="mt-4 flex items-center gap-4">
               <ReportButton targetType="post" targetId={post.id} />
             </div>
+            <PostOwnerControls postId={post.id} authorId={post.author_id} initialTitle={post.title} initialBody={post.body} />
           </article>
 
           <section className="mt-12 border-t border-[var(--qf-line)] pt-8">
@@ -99,12 +102,13 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
                   <p className="whitespace-pre-wrap text-[14.5px] leading-relaxed text-[var(--qf-ink)]">
                     {reply.body}
                   </p>
-                  <div className="mt-2 flex items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
                     <span>{reply.author_display_name}</span>
                     <span aria-hidden>·</span>
                     <span>{formatDate(reply.created_at)}</span>
                     <span aria-hidden>·</span>
                     <ReportButton targetType="reply" targetId={reply.id} />
+                    <ReplyOwnerControls replyId={reply.id} authorId={reply.author_id} initialBody={reply.body} />
                   </div>
                 </div>
               ))}

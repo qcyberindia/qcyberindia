@@ -8,9 +8,9 @@ export default function QFinanceHeader() {
         <Link
           href="/qfinance"
           className="font-display text-xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-[22px]"
-          aria-label="QFinance home"
+          aria-label="QFinera home"
         >
-          Q<em className="not-italic text-[var(--qf-brass)]">Finance</em>
+          Q<em className="not-italic text-[var(--qf-brass)]">Finera</em>
         </Link>
 
         <div className="flex items-center gap-4 sm:gap-5">

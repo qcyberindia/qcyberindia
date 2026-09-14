@@ -113,7 +113,7 @@ export default async function CommunityPage({
             href="/qfinance/beta"
             className="group rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-colors hover:border-[var(--qf-brass)]"
           >
-            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Want to help shape QFinance?</p>
+            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Want to help shape QFinera?</p>
             <p className="mt-1 flex items-center gap-1 text-[13.5px] font-medium text-[var(--qf-brass-dark)]">
               Join the Beta
               <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />

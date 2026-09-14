@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
     to: siteConfig.email.info,
     from: `noreply@${siteConfig.domain}`,
     replyTo: email,
-    subject: `📈 New QFinance Beta Registration — ${name}`,
+    subject: `📈 New QFinera Beta Registration — ${name}`,
     text: [
       `Name: ${name}`,
       `Email: ${email}`,
