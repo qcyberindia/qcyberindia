@@ -1,15 +1,14 @@
 // QFinera brand config, kept separate from lib/site-config.ts so Qbids
 // and the rest of QCyberIndia are never touched.
 //
-// Brand migration note (QFinera pivot, website-marketing scope only —
-// see qfinance.md): the product's public name changed from "QFinance" to
-// "QFinera". Routes, database table names (qfinance_*), env var names
-// (QFINANCE_AUTH_SECRET, QFINANCE_APP_URL), and internal file/module names
-// deliberately still say "qfinance" — renaming those would be a production
-// URL-compatibility and database-migration risk for zero user-facing
-// benefit. This config is the one place the *visible* brand name lives, so
-// every page that reads `qfinanceConfig.name` picked up "QFinera"
-// automatically without a repo-wide find/replace.
+// Brand + route migration note (QFinera pivot — see qfinance.md): the
+// product's public name changed from "QFinance" to "QFinera", AND the
+// public route moved from /qfinance to /qfinera (see next.config.ts's
+// permanent redirects covering every old /qfinance/* path). Database table
+// names (qfinance_*), env var names (QFINANCE_AUTH_SECRET,
+// QFINANCE_APP_URL), and internal file/module names deliberately still say
+// "qfinance" — renaming those would be a production database-migration
+// risk for zero user-facing benefit, since nothing about them is visible.
 import { siteConfig } from "@/lib/site-config";
 
 export const qfinanceConfig = {
