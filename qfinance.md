@@ -466,6 +466,49 @@ the public QFinance product the no-monospace rule is scoped to, so left as-is.)
 
 ---
 
+## Session 19 — Marketing/SaaS terminology alignment audit (read-first, small justified copy fixes only)
+
+### Scope
+Read-first audit per the incoming brief: classify every user-facing surface
+against the frozen future-SaaS product language (verified account +
+pseudonymous community identity, Portfolio-as-evidence, Thesis, Q&A,
+Q-Points), fix only genuine terminology/privacy mismatches, do not build
+any SaaS backend (Q-Points ledger, verification infra, handle system).
+
+### Audited (read fresh, not assumed)
+`app/qfinera/{page,about,beta,community}/page.tsx`,
+`app/qfinera/community/[id]/page.tsx`,
+`components/qfinance/community/{SignInForm,PostCard,CommunityGuidelines,AskQuestionButton}.tsx`.
+
+### Findings
+| Area | Classification | Note |
+|---|---|---|
+| Homepage | MATCH | No false current/future claims found; doesn't mention identity model either way — neutral, not misleading. |
+| Beta page | MATCH | Already correctly future-framed ("gets you early access to what comes after it, as it's built"). |
+| Community feed/guidelines | MATCH | Accurately describes a beginner Q&A community; doesn't overclaim thesis/portfolio features it doesn't have. |
+| Email privacy | MATCH | Confirmed no component ever renders `email`, only `author_display_name` — checked `PostCard`, post detail, `AskQuestionButton`. |
+| About page feature grid | **COPY FIX** | All six loop items (Portfolio/Journal/Thesis/Community/Profile/Contribution) had equal visual weight with no current-vs-future distinction beyond a closing paragraph. Fixed: added a per-card "Live today" / "Coming with beta" badge. |
+| About page identity/privacy | **COPY FIX (gap)** | Page never mentioned verification or pseudonymity at all. Added one paragraph: "You're a verified member... you don't need to use your real name... your email is never shown to anyone else" — accurately describes the *actual* mechanism (control of an email inbox via magic link = the verification; display name = the pseudonymous identity), without claiming a handle system that doesn't exist. |
+| Sign-in form | **COPY FIX** | "Display name" field had no hint that a nickname works, in tension with pseudonymous positioning. Added "(a nickname is fine)" to the placeholder and an explicit "your email stays private" line. |
+| Q-Points/reputation | ARCHITECTURAL GAP (documented, not built) | No ledger/points table exists. About page's "Contribution" card copy changed from a specific promised mechanism ("can lower next month's cost") to a more honestly vague "can become part of your reputation" — avoids promising a monetary mechanism that isn't built or locked. |
+| Pseudonymous handle system | ARCHITECTURAL GAP (documented, not built) | Current identity = email + freely-chosen display name, not an auto-generated handle. Not built this session — explicitly out of scope per the brief ("do not invent a new database identity system merely to make the marketing site appear complete"). |
+
+### Files changed
+- `components/qfinance/community/SignInForm.tsx`
+- `app/qfinera/about/page.tsx`
+
+### NOT done
+- `npm run lint` / `npm run build` / `git status --short` / `git diff --check` — not run, no shell access, standing limitation every session.
+- No literal `grep` executed (no shell) — the brief's suggested grep command was approximated via direct file reads of every actively-linked QFinera page and component; not a repo-wide guarantee the way an actual grep would be.
+- Did not re-verify whether the concurrent editor (see Session 18) made further changes during this session — worth a fresh check before trusting this audit's findings stay valid.
+
+### Next
+1. Run `npm run lint && npm run build && git status --short` — unchanged top priority.
+2. Run an actual `grep -Rni "QFinance\|QFINANCE" app/qfinera components/qfinance lib/qfinance-config.ts` to catch anything this file-by-file read missed.
+3. Confirm current state of the repo against Session 18's noted concurrent-editing risk before further work.
+
+---
+
 ## Session 18 — QFinera rebrand execution + community edit/delete completed end-to-end + discovered a concurrent route rename mid-session
 
 ### Context

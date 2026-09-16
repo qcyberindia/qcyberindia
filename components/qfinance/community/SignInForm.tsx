@@ -56,13 +56,14 @@ export default function SignInForm({ prompt = "Sign in to continue" }: { prompt?
     <form onSubmit={handleSubmit} className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-4">
       <p className="text-[14px] font-medium text-[var(--qf-ink)]">{prompt}</p>
       <p className="mt-1 text-[13px] text-[var(--qf-ink-soft)]">
-        No password — we&apos;ll email you a one-click sign-in link.
+        No password — we&apos;ll email you a one-click sign-in link. Your email stays private; only
+        your display name is shown publicly.
       </p>
 
       <div className="mt-3 space-y-2.5">
         <input
           type="text"
-          placeholder="Display name"
+          placeholder="Display name (a nickname is fine)"
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
           maxLength={40}

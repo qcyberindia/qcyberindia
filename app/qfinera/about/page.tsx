@@ -13,12 +13,12 @@ export const metadata: Metadata = {
 };
 
 const loop = [
-  { icon: Landmark, label: "Portfolio", description: "Connect your holdings — starting with Zerodha — and see them in one place." },
-  { icon: NotebookPen, label: "Journal", description: "Record an investment decision, your reasoning, and what you believed at the time." },
-  { icon: FlaskConical, label: "Research / Thesis", description: "Turn scattered notes into an actual thesis — save drafts, publish when ready." },
-  { icon: Users, label: "Community", description: "Discuss your thinking with other investors. Live today." },
-  { icon: UserCircle, label: "Profile", description: "Your research, journal history, and contributions in one place." },
-  { icon: Award, label: "Contribution", description: "Meaningful contribution to the community can lower next month's cost." },
+  { icon: Landmark, label: "Portfolio", description: "Connect your holdings — starting with Zerodha — and see them in one place.", live: false },
+  { icon: NotebookPen, label: "Journal", description: "Record an investment decision, your reasoning, and what you believed at the time.", live: false },
+  { icon: FlaskConical, label: "Research / Thesis", description: "Turn scattered notes into an actual thesis — save drafts, publish when ready.", live: false },
+  { icon: Users, label: "Community", description: "Discuss your thinking with other investors.", live: true },
+  { icon: UserCircle, label: "Profile", description: "Your research, journal history, and contributions in one place.", live: false },
+  { icon: Award, label: "Contribution", description: "Meaningful contribution to the community can become part of your reputation.", live: false },
 ];
 
 export default function AboutPage() {
@@ -61,6 +61,11 @@ export default function AboutPage() {
               recommendations. Reflection over reaction. Discussion that sharpens a thesis, not one
               that just tells you what to buy.
             </p>
+            <p>
+              You&apos;re a verified member — we know it&apos;s really you behind your account — but you
+              don&apos;t need to use your real name to take part. What you choose to share publicly in
+              Community is up to you; your email is never shown to anyone else.
+            </p>
           </Reveal>
         </div>
       </section>
@@ -81,7 +86,16 @@ export default function AboutPage() {
               const Icon = item.icon;
               return (
                 <Reveal key={item.label} delay={i * 70}>
-                  <div className="flex h-full flex-col rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5">
+                  <div className="relative flex h-full flex-col rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5">
+                    <span
+                      className={`absolute right-3 top-3 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide ${
+                        item.live
+                          ? "border-[var(--qf-up)]/40 bg-[var(--qf-up)]/10 text-[var(--qf-up)]"
+                          : "border-[var(--qf-line)] bg-[var(--qf-cream-0)] text-[var(--qf-ink-soft)]"
+                      }`}
+                    >
+                      {item.live ? "Live today" : "Coming with beta"}
+                    </span>
                     <Icon size={20} className="text-[var(--qf-brass)]" />
                     <p className="mt-3 font-display text-[15px] font-semibold text-[var(--qf-ink)]">{item.label}</p>
                     <p className="mt-1.5 text-[13px] leading-relaxed text-[var(--qf-ink-soft)]">{item.description}</p>
