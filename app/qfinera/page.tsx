@@ -1,12 +1,11 @@
 import Link from "next/link";
-import { ArrowRight, Landmark, NotebookPen, FlaskConical } from "lucide-react";
+import { ArrowRight, Landmark, FlaskConical, Users } from "lucide-react";
 import { listQFinanceCommunityPosts } from "@/lib/db";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import PostCard from "@/components/qfinance/community/PostCard";
 import AskQuestionButton from "@/components/qfinance/community/AskQuestionButton";
 import Reveal from "@/components/Reveal";
-import { qfinanceConfig } from "@/lib/qfinance-config";
 
 // Community-first homepage (see qfinance.md). The Community feed itself is
 // the hero — no large marketing section precedes it. Fetches through the
@@ -14,10 +13,25 @@ import { qfinanceConfig } from "@/lib/qfinance-config";
 // and renders results with the same PostCard component, so this is a
 // second *view* of Community, not a second Community implementation.
 
-const vision = [
-  { icon: Landmark, label: "Portfolio", body: "See the holdings behind your investment thinking." },
-  { icon: NotebookPen, label: "Journal", body: "Record why you invested, what changed, and what you believe now." },
-  { icon: FlaskConical, label: "Research", body: "Build and organize the reasoning behind your investment thesis." },
+const roadmap = [
+  {
+    icon: Users,
+    label: "Community",
+    status: "live" as const,
+    body: "Ask a question, discuss it with other investors, and get real replies — open now.",
+  },
+  {
+    icon: Landmark,
+    label: "Portfolio",
+    status: "building" as const,
+    body: "Connect your holdings — starting with Zerodha — and see them in one place.",
+  },
+  {
+    icon: FlaskConical,
+    label: "Research",
+    status: "building" as const,
+    body: "Turn a journal entry into an organized thesis — evidence, reasoning, conclusion.",
+  },
 ];
 
 export default async function QFineraHomePage() {
@@ -92,34 +106,71 @@ export default async function QFineraHomePage() {
         </div>
       </section>
 
-      {/* Product vision — visually connected to the hero above via the same
-          brass/cream language, but clearly a distinct, secondary section:
-          tinted background, card treatment, explicit "being built" status
-          so nothing here reads as available today. */}
+      {/* Product story: Community is the live anchor everything else builds
+          toward — one connected progression, not three equal feature cards.
+          Only Community gets a filled/brass treatment + working CTA;
+          Portfolio and Research are visibly quieter and explicitly
+          "Being built" so nothing here reads as available today. */}
       <section className="border-t border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-2xl">
           <Reveal>
             <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
-              What&apos;s coming to {qfinanceConfig.name}
+              Built around a live Community
             </p>
             <p className="mx-auto mt-2 max-w-sm text-center text-[14px] leading-relaxed text-[var(--qf-ink-soft)]">
-              The Community is live today. This is what we&apos;re building around it.
+              Community is live today. Portfolio and Research are what we&apos;re building around it.
             </p>
           </Reveal>
-          <div className="mt-9 grid gap-4 sm:grid-cols-3">
-            {vision.map((v, i) => {
+
+          <div className="mt-9 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+            {roadmap.map((v, i) => {
               const Icon = v.icon;
+              const isLive = v.status === "live";
               return (
-                <Reveal key={v.label} delay={i * 80}>
-                  <div className="relative flex h-full flex-col rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-5">
-                    <span className="absolute right-3 top-3 rounded-full border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">
-                      Being built
-                    </span>
-                    <Icon size={20} className="text-[var(--qf-brass)]" />
-                    <p className="mt-3 font-display text-[15px] font-semibold text-[var(--qf-ink)]">{v.label}</p>
-                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--qf-ink-soft)]">{v.body}</p>
-                  </div>
-                </Reveal>
+                <div key={v.label} className="flex flex-1 items-center gap-3">
+                  <Reveal delay={i * 80} className="w-full">
+                    <div
+                      className={`relative flex h-full flex-col rounded-md border p-5 transition-colors ${
+                        isLive
+                          ? "border-[var(--qf-brass)] bg-[var(--qf-cream-0)] shadow-sm"
+                          : "border-[var(--qf-line)] bg-[var(--qf-cream-0)]/60"
+                      }`}
+                    >
+                      <span
+                        className={`inline-flex w-fit items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                          isLive
+                            ? "border-[var(--qf-brass)]/50 bg-[var(--qf-brass)]/12 text-[var(--qf-brass-dark)]"
+                            : "border-[var(--qf-line)] bg-[var(--qf-cream-1)] text-[var(--qf-ink-soft)]"
+                        }`}
+                      >
+                        {isLive && (
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-[var(--qf-brass)] opacity-60" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-[var(--qf-brass)]" />
+                          </span>
+                        )}
+                        {isLive ? "Live today" : "Being built"}
+                      </span>
+                      <Icon size={20} className={isLive ? "mt-3 text-[var(--qf-brass)]" : "mt-3 text-[var(--qf-ink-soft)]"} />
+                      <p className={`mt-2.5 font-display text-[15px] font-semibold ${isLive ? "text-[var(--qf-ink)]" : "text-[var(--qf-ink)]/80"}`}>
+                        {v.label}
+                      </p>
+                      <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--qf-ink-soft)]">{v.body}</p>
+                      {isLive && (
+                        <Link
+                          href="/qfinera/community"
+                          className="mt-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-[var(--qf-brass)] px-4 py-2 font-display text-[13px] font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
+                        >
+                          Explore Community
+                          <ArrowRight size={13} />
+                        </Link>
+                      )}
+                    </div>
+                  </Reveal>
+                  {i < roadmap.length - 1 && (
+                    <ArrowRight size={16} className="hidden shrink-0 text-[var(--qf-line)] sm:block" aria-hidden />
+                  )}
+                </div>
               );
             })}
           </div>

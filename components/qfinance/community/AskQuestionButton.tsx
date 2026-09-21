@@ -151,7 +151,7 @@ function ComposerForm({ onClose }: { onClose: () => void }) {
         <AutoTextarea
           value={question}
           onChange={setQuestion}
-          placeholder="Why has Nifty 50 fallen so much when many companies are doing better than FY25?"
+          placeholder="What makes a company worth investing in?"
           minRows={3}
           maxRows={8}
           maxLength={150}
