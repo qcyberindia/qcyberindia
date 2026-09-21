@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Mail, Loader2, CheckCircle2 } from "lucide-react";
+import { Loader2, CheckCircle2, ShieldCheck } from "lucide-react";
 
 const inputClass =
-  "w-full rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-3.5 py-2.5 text-[15px] text-[var(--qf-ink)] outline-none transition-colors focus:border-[var(--qf-brass)]";
+  "w-full rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-3.5 py-2.5 text-[15px] text-[var(--qf-ink)] outline-none transition-colors placeholder:text-[var(--qf-ink-soft)]/60 focus:border-[var(--qf-brass)] focus:ring-2 focus:ring-[var(--qf-brass)]/15";
+
+const labelClass = "text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]";
 
 /** Passwordless sign-in: email + display name → magic link email. Used
  * anywhere the Community needs identity (asking a question, replying,
- * reporting) before the action can proceed. */
+ * reporting) before the action can proceed. Same functionality/endpoint as
+ * before — this pass is presentation only, to feel like a deliberate
+ * QFinera product component rather than a generic login form. */
 export default function SignInForm({ prompt = "Sign in to continue" }: { prompt?: string }) {
   const [email, setEmail] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -40,54 +44,80 @@ export default function SignInForm({ prompt = "Sign in to continue" }: { prompt?
 
   if (status === "sent") {
     return (
-      <div className="flex items-start gap-2.5 rounded-md border border-[var(--qf-up)]/30 bg-[var(--qf-up)]/10 p-4">
-        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-[var(--qf-up)]" />
-        <div>
-          <p className="text-[14.5px] font-medium text-[var(--qf-ink)]">Check your email</p>
-          <p className="mt-1 text-[13.5px] text-[var(--qf-ink-soft)]">
-            We sent a sign-in link to {email}. It expires in 15 minutes.
-          </p>
+      <div className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5">
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--qf-up)]/15">
+            <CheckCircle2 size={17} className="text-[var(--qf-up)]" />
+          </span>
+          <div>
+            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Check your email</p>
+            <p className="mt-1 text-[13.5px] leading-relaxed text-[var(--qf-ink-soft)]">
+              We sent a secure sign-in link to <strong className="text-[var(--qf-ink)]">{email}</strong>.
+              It expires in 15 minutes and can only be used once.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-4">
-      <p className="text-[14px] font-medium text-[var(--qf-ink)]">{prompt}</p>
-      <p className="mt-1 text-[13px] text-[var(--qf-ink-soft)]">
-        No password — we&apos;ll email you a one-click sign-in link. Your email stays private; only
-        your display name is shown publicly.
-      </p>
+    <form onSubmit={handleSubmit} className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 sm:p-6">
+      <p className="font-display text-lg font-semibold text-[var(--qf-ink)]">Join the QFinera Community</p>
+      <p className="mt-1 text-[13.5px] text-[var(--qf-ink-soft)]">{prompt}</p>
 
-      <div className="mt-3 space-y-2.5">
-        <input
-          type="text"
-          placeholder="Display name (a nickname is fine)"
-          value={displayName}
-          onChange={(e) => setDisplayName(e.target.value)}
-          maxLength={40}
-          required
-          className={inputClass}
-        />
-        <input
-          type="email"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          required
-          className={inputClass}
-        />
+      <div className="mt-4 flex items-start gap-2.5 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-3.5">
+        <ShieldCheck size={16} className="mt-0.5 shrink-0 text-[var(--qf-brass)]" />
+        <p className="text-[12.5px] leading-relaxed text-[var(--qf-ink-soft)]">
+          Sign in with your email. No password to remember — we&apos;ll send a secure one-time link
+          instead. Your email stays private; only your display name appears in the community.
+        </p>
       </div>
 
-      {error && <p className="mt-2 text-[13px] text-[var(--qf-down)]">{error}</p>}
+      <div className="mt-4 space-y-3.5">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="qf-signin-name" className={labelClass}>
+            Display name
+          </label>
+          <input
+            id="qf-signin-name"
+            type="text"
+            placeholder="A nickname is fine"
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+            maxLength={40}
+            required
+            className={inputClass}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="qf-signin-email" className={labelClass}>
+            Email
+          </label>
+          <input
+            id="qf-signin-email"
+            type="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className={inputClass}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-md border border-[var(--qf-down)]/30 bg-[var(--qf-down)]/10 px-3 py-2 text-[13px] text-[var(--qf-down)]">
+          {error}
+        </p>
+      )}
 
       <button
         type="submit"
         disabled={status === "submitting"}
-        className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-[var(--qf-brass)] px-4 py-2 text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 disabled:opacity-60"
+        className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-md bg-[var(--qf-brass-dark)] px-4 py-2.5 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:px-8"
       >
-        {status === "submitting" ? <Loader2 size={14} className="animate-spin" /> : <Mail size={14} />}
+        {status === "submitting" && <Loader2 size={14} className="animate-spin" />}
         {status === "submitting" ? "Sending…" : "Email me a sign-in link"}
       </button>
     </form>

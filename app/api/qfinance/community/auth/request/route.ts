@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOrCreateQFinanceUser, isDbConfigured } from "@/lib/db";
 import { createMagicLinkToken } from "@/lib/qfinance-community-auth";
 import { sendEmail } from "@/lib/email";
+import { buildQFinanceMagicLinkEmail } from "@/lib/qfinance-beta-email";
 import { qfinanceConfig } from "@/lib/qfinance-config";
+import { siteConfig } from "@/lib/site-config";
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -107,16 +109,11 @@ export async function POST(req: NextRequest) {
   const result = await sendEmail({
     to: user.email,
     from: `noreply@${qfinanceConfig.domain}`,
-    subject: "Sign in to QFinera Community",
-    text: [
-      `Hi ${user.display_name},`,
-      "",
-      "Click the link below to sign in to QFinera Community. It expires in 15 minutes.",
-      "",
+    ...buildQFinanceMagicLinkEmail({
+      displayName: user.display_name,
       verifyUrl,
-      "",
-      "If you didn't request this, you can ignore this email.",
-    ].join("\n"),
+      supportEmail: siteConfig.email.support,
+    }),
   });
 
   if (!result.ok) {
