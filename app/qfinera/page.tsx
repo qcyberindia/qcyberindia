@@ -34,7 +34,7 @@ export default async function QFineraHomePage() {
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
             <h1 className="font-display text-3xl font-semibold leading-[1.1] tracking-tight text-[var(--qf-ink)] sm:text-[40px]">
-              A New. <em className="font-light italic text-[var(--qf-brass-dark)]">Financial.</em> Era.
+              A New. <em className="italic text-[var(--qf-brass-dark)]">Financial.</em> Era.
             </h1>
             <p className="mx-auto mt-4 max-w-md text-[15.5px] leading-relaxed text-[var(--qf-ink-soft)]">
               A private room for investors to discuss, research, record, and improve their
@@ -66,7 +66,7 @@ export default async function QFineraHomePage() {
               <div className="rounded-md border border-dashed border-[var(--qf-line)] p-10 text-center">
                 <p className="font-display text-lg font-semibold text-[var(--qf-ink)]">Nothing to discuss yet.</p>
                 <p className="mt-1.5 text-[14px] text-[var(--qf-ink-soft)]">
-                  Ask something you&apos;ve been wondering about \u2014 you&apos;ll be the first.
+                  Ask something you&apos;ve been wondering about — you&apos;ll be the first.
                 </p>
               </div>
             ) : (
