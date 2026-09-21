@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Landmark, NotebookPen, FlaskConical } from "lucide-react";
 import { listQFinanceCommunityPosts } from "@/lib/db";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
@@ -15,9 +15,9 @@ import { qfinanceConfig } from "@/lib/qfinance-config";
 // second *view* of Community, not a second Community implementation.
 
 const vision = [
-  { label: "Portfolio", status: "Being built", body: "Connect your investment view with the holdings you actually own." },
-  { label: "Journal", status: "Being built", body: "Record why you invested, what changed, and what you believe now." },
-  { label: "Research", status: "Being built", body: "Build and organize your own investment thesis." },
+  { icon: Landmark, label: "Portfolio", body: "See the holdings behind your investment thinking." },
+  { icon: NotebookPen, label: "Journal", body: "Record why you invested, what changed, and what you believe now." },
+  { icon: FlaskConical, label: "Research", body: "Build and organize the reasoning behind your investment thesis." },
 ];
 
 export default async function QFineraHomePage() {
@@ -50,9 +50,15 @@ export default async function QFineraHomePage() {
           <Reveal>
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
-                  Live today
-                </p>
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-[var(--qf-brass)] opacity-60" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--qf-brass)]" />
+                  </span>
+                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--qf-brass-dark)]">
+                    Live Today
+                  </p>
+                </div>
                 <h2 className="mt-1.5 font-display text-2xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-[28px]">
                   Questions investors are trying to understand.
                 </h2>
@@ -86,24 +92,36 @@ export default async function QFineraHomePage() {
         </div>
       </section>
 
-      {/* Compact product vision \u2014 secondary to Community, honestly labeled */}
+      {/* Product vision — visually connected to the hero above via the same
+          brass/cream language, but clearly a distinct, secondary section:
+          tinted background, card treatment, explicit "being built" status
+          so nothing here reads as available today. */}
       <section className="border-t border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-2xl">
           <Reveal>
             <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
               What&apos;s coming to {qfinanceConfig.name}
             </p>
+            <p className="mx-auto mt-2 max-w-sm text-center text-[14px] leading-relaxed text-[var(--qf-ink-soft)]">
+              The Community is live today. This is what we&apos;re building around it.
+            </p>
           </Reveal>
-          <div className="mt-8 grid gap-6 sm:grid-cols-3">
-            {vision.map((v, i) => (
-              <Reveal key={v.label} delay={i * 80}>
-                <div className="border-t border-[var(--qf-line)] pt-4">
-                  <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">{v.label}</p>
-                  <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--qf-ink-soft)]">{v.status}</p>
-                  <p className="mt-2 text-[13.5px] leading-relaxed text-[var(--qf-ink-soft)]">{v.body}</p>
-                </div>
-              </Reveal>
-            ))}
+          <div className="mt-9 grid gap-4 sm:grid-cols-3">
+            {vision.map((v, i) => {
+              const Icon = v.icon;
+              return (
+                <Reveal key={v.label} delay={i * 80}>
+                  <div className="relative flex h-full flex-col rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-5">
+                    <span className="absolute right-3 top-3 rounded-full border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">
+                      Being built
+                    </span>
+                    <Icon size={20} className="text-[var(--qf-brass)]" />
+                    <p className="mt-3 font-display text-[15px] font-semibold text-[var(--qf-ink)]">{v.label}</p>
+                    <p className="mt-1.5 text-[13.5px] leading-relaxed text-[var(--qf-ink-soft)]">{v.body}</p>
+                  </div>
+                </Reveal>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -120,11 +138,11 @@ export default async function QFineraHomePage() {
                 href="/qfinera/community"
                 className="inline-flex items-center gap-2 rounded-sm bg-[var(--qf-brass)] px-6 py-3 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
               >
-                Explore QFinera
+                Explore Community
                 <ArrowRight size={15} />
               </Link>
               <Link href="/qfinera/beta" className="font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline">
-                Join the Beta →
+                Join QFinera →
               </Link>
             </div>
           </Reveal>

@@ -71,6 +71,62 @@ export default function AboutPage() {
       </section>
 
       <section className="border-t border-[var(--qf-line)] px-6 py-16 sm:py-20">
+        <div className="mx-auto max-w-xl">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
+              What {qfinanceConfig.name} is not
+            </p>
+            <div className="mt-4 space-y-2.5 text-[15px] leading-relaxed text-[var(--qf-ink)]">
+              <p>
+                Not a trading platform. {qfinanceConfig.name} doesn&apos;t place orders, execute trades,
+                or connect to a broker to move money — Portfolio, when it ships, reads your holdings; it
+                doesn&apos;t act on them.
+              </p>
+              <p>
+                Not a signals or copy-trading service. Nobody here tells you what to buy or sell, and no
+                feature is built to let you copy another member&apos;s trades. Community discussion is
+                for learning and clarification, not personalized financial advice.
+              </p>
+              <p>
+                Not a returns promise. Nothing on this site or in the product implies a guaranteed or
+                expected return. What you do with your own money is your decision, based on your own
+                research and circumstances.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="border-t border-[var(--qf-line)] px-6 py-16 sm:py-20">
+        <div className="mx-auto max-w-xl">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
+              How Community works
+            </p>
+            <div className="mt-4 space-y-4 text-[15px] leading-relaxed text-[var(--qf-ink)]">
+              <p>
+                Anyone can ask a question — what a term means, why something moved, what a filing
+                actually said. Other members reply with what they know, what they&apos;d research next,
+                or a different way to look at it. A thread is a small, asynchronous discussion, not a
+                live chat and not a comments section.
+              </p>
+              <p>
+                Every account is verified before it can post, so you&apos;re talking to real people —
+                but what you show publicly is a display name you choose, not your legal identity or
+                your email address. Posts and replies stay visible to everyone; you can edit or delete
+                your own at any time.
+              </p>
+              <p>
+                Moderation exists and is enforced: no guaranteed-return claims, no pump-and-dump
+                behavior, no personalized buy/sell instructions presented as certainty, no spam or
+                impersonation.
+              </p>
+            </div>
+          </Reveal>
+        </div>
+      </section>
+
+      <section className="border-t border-[var(--qf-line)] px-6 py-16 sm:py-20">
         <div className="mx-auto max-w-4xl">
           <Reveal>
             <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
@@ -120,7 +176,7 @@ export default function AboutPage() {
               href="/qfinera/beta"
               className="inline-flex items-center gap-2 rounded-sm bg-[var(--qf-brass)] px-6 py-3 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
             >
-              Join the Beta
+              Join QFinera
               <ArrowRight size={15} />
             </Link>
             <Link href="/qfinera/community" className="font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline">

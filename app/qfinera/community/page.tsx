@@ -55,6 +55,17 @@ export default async function CommunityPage({
         </div>
 
         <div className="mt-6 space-y-3">
+          {posts.length > 0 && !category && (
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-[var(--qf-brass)] opacity-60" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--qf-brass)]" />
+              </span>
+              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--qf-brass-dark)]">
+                Live Today
+              </p>
+            </div>
+          )}
           {posts.length === 0 ? (
             <div className="rounded-md border border-dashed border-[var(--qf-line)] p-10 text-center">
               <MessageCircleQuestion size={28} className="mx-auto text-[var(--qf-ink-soft)]" />
@@ -115,7 +126,7 @@ export default async function CommunityPage({
           >
             <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Want to help shape QFinera?</p>
             <p className="mt-1 flex items-center gap-1 text-[13.5px] font-medium text-[var(--qf-brass-dark)]">
-              Join the Beta
+              Join QFinera
               <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
             </p>
           </Link>
