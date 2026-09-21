@@ -57,7 +57,7 @@ export default function AboutPage() {
               About {qfinanceConfig.name}
             </p>
             <h1 className="mt-4 font-display text-3xl font-semibold leading-tight tracking-tight text-[var(--qf-ink)] sm:text-4xl">
-              A New. <em className="font-light italic text-[var(--qf-brass-dark)]">Financial.</em> Era.
+              A New. <em className="italic text-[var(--qf-brass-dark)]">Financial.</em> Era.
             </h1>
             <p className="mt-5 text-[16px] leading-relaxed text-[var(--qf-ink-soft)]">
               {qfinanceConfig.description}

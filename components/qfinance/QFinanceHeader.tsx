@@ -51,7 +51,7 @@ export default function QFinanceHeader() {
 
           <Link
             href="/qfinera/beta"
-            className="rounded-sm bg-[var(--qf-brass)] px-4 py-2.5 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
+            className="hidden rounded-sm bg-[var(--qf-brass)] px-4 py-2.5 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 sm:inline-block"
           >
             Join QFinera
           </Link>
@@ -70,10 +70,10 @@ export default function QFinanceHeader() {
 
       <div
         className={`overflow-hidden border-t border-[var(--qf-line)] bg-[var(--qf-cream-0)] transition-[max-height] duration-300 ease-in-out sm:hidden ${
-          open ? "max-h-60" : "max-h-0 border-t-0"
+          open ? "max-h-72" : "max-h-0 border-t-0"
         }`}
       >
-        <div className="flex flex-col px-6 py-3">
+        <div className="flex flex-col gap-1 px-6 py-3">
           {links.map((l) => {
             const active = isActive(l.href);
             return (
@@ -90,6 +90,16 @@ export default function QFinanceHeader() {
               </Link>
             );
           })}
+          {/* Same CTA as the desktop pill — just moved in here below `sm`,
+              since logo + theme toggle + pill + hamburger together overflow
+              at 320–375px when the pill sits in the top row. */}
+          <Link
+            href="/qfinera/beta"
+            onClick={() => setOpen(false)}
+            className="mt-1.5 rounded-sm bg-[var(--qf-brass)] px-4 py-2.5 text-center font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
+          >
+            Join QFinera
+          </Link>
         </div>
       </div>
     </header>
