@@ -179,7 +179,7 @@ export async function ensureQFinanceCommunityTables(): Promise<void> {
       id SERIAL PRIMARY KEY,
       author_id INTEGER NOT NULL REFERENCES qfinance_users(id),
       title TEXT NOT NULL,
-      body TEXT NOT NULL,
+      body TEXT,
       category TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('published', 'hidden', 'removed')),
       is_seed BOOLEAN NOT NULL DEFAULT false,
@@ -214,6 +214,11 @@ export async function ensureQFinanceCommunityTables(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_qf_posts_status ON qfinance_community_posts (status);
     CREATE INDEX IF NOT EXISTS idx_qf_replies_post_id ON qfinance_community_replies (post_id);
     CREATE INDEX IF NOT EXISTS idx_qf_reports_status ON qfinance_community_reports (status);
+
+    -- Runtime fallback for the 004 migration, for any deploy that never ran
+    -- it: makes body optional even on an already-existing table. A no-op if
+    -- the column is already nullable.
+    ALTER TABLE qfinance_community_posts ALTER COLUMN body DROP NOT NULL;
   `);
 }
 
@@ -231,6 +236,29 @@ export const QFINANCE_COMMUNITY_CATEGORIES = [
   "Apps & Accounts",
   "General",
 ] as const;
+
+// Lightweight, deterministic keyword heuristic — no external AI service,
+// no network call. Good enough for a "here's a starting guess" suggestion
+// the user can freely override; never blocks posting if nothing matches.
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  Stocks: ["stock", "share", "shares", "equity", "ipo", "dividend"],
+  "Mutual Funds & ETFs": ["mutual fund", "mf", "etf", "sip", "nav", "index fund"],
+  Markets: ["nifty", "sensex", "market", "index", "bull", "bear", "crash", "rally", "correction"],
+  "Risk & Safety": ["scam", "fraud", "safe", "risk", "guarantee", "loss", "lose everything"],
+  "Costs & Taxes": ["tax", "brokerage", "charges", "fee", "stt", "gst", "capital gains"],
+  "Apps & Accounts": ["demat", "broker", "app", "account", "kyc", "kite", "groww", "zerodha"],
+  "Getting Started": ["beginner", "start", "new to", "how do i begin", "first time"],
+};
+
+export function suggestQFinanceCategory(question: string): (typeof QFINANCE_COMMUNITY_CATEGORIES)[number] {
+  const q = question.toLowerCase();
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
+    if (keywords.some((kw) => q.includes(kw))) {
+      return category as (typeof QFINANCE_COMMUNITY_CATEGORIES)[number];
+    }
+  }
+  return "General";
+}
 
 export type QFinanceUser = { id: number; email: string; display_name: string };
 
@@ -276,7 +304,7 @@ export async function getQFinanceUserById(id: number): Promise<QFinanceUser | nu
 export type QFinancePost = {
   id: number;
   title: string;
-  body: string;
+  body: string | null;
   category: string;
   status: string;
   is_seed: boolean;
@@ -401,16 +429,19 @@ export type CreatePostResult =
 export async function createQFinanceCommunityPost(input: {
   authorId: number;
   title: string;
-  body: string;
+  body?: string;
   category: string;
 }): Promise<CreatePostResult> {
   const p = getPool();
   if (!p) return { ok: false, error: "Database is not configured." };
 
   const title = input.title.trim().slice(0, MAX_TITLE_LEN);
-  const body = input.body.trim().slice(0, MAX_BODY_LEN);
+  // Context/body is optional — a question stands on its own. Store null
+  // rather than an empty string so "no context given" is unambiguous.
+  const trimmedBody = (input.body ?? "").trim().slice(0, MAX_BODY_LEN);
+  const body = trimmedBody || null;
 
-  if (!title || !body) return { ok: false, error: "Title and question are required." };
+  if (!title) return { ok: false, error: "A question is required." };
   if (!(QFINANCE_COMMUNITY_CATEGORIES as readonly string[]).includes(input.category)) {
     return { ok: false, error: "Invalid category." };
   }
@@ -493,14 +524,15 @@ export async function getQFinanceReplyAuthorId(id: number): Promise<number | nul
 export async function updateOwnQFinanceCommunityPost(
   id: number,
   authorId: number,
-  input: { title: string; body: string }
+  input: { title: string; body?: string }
 ): Promise<{ ok: boolean; error?: string }> {
   const p = getPool();
   if (!p) return { ok: false, error: "Database is not configured." };
 
   const title = input.title.trim().slice(0, MAX_TITLE_LEN);
-  const body = input.body.trim().slice(0, MAX_BODY_LEN);
-  if (!title || !body) return { ok: false, error: "Title and question are required." };
+  const trimmedBody = (input.body ?? "").trim().slice(0, MAX_BODY_LEN);
+  const body = trimmedBody || null;
+  if (!title) return { ok: false, error: "A question is required." };
 
   // The WHERE clause itself enforces ownership — an UPDATE that matches
   // zero rows (wrong owner, or post already removed) is indistinguishable

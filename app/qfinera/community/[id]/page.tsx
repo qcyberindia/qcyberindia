@@ -29,7 +29,7 @@ export async function generateMetadata({
   }
   return {
     title: result.post.title,
-    description: result.post.body.slice(0, 155),
+    description: (result.post.body || result.post.title).slice(0, 155),
     alternates: { canonical: `/qfinera/community/${id}` },
   };
 }
@@ -80,9 +80,11 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
               <span>{formatDate(post.created_at)}</span>
             </div>
 
-            <p className="mt-6 whitespace-pre-wrap text-[15.5px] leading-relaxed text-[var(--qf-ink)]">
-              {post.body}
-            </p>
+            {post.body && (
+              <p className="mt-6 whitespace-pre-wrap text-[15.5px] leading-relaxed text-[var(--qf-ink)]">
+                {post.body}
+              </p>
+            )}
 
             <div className="mt-4 flex items-center gap-4">
               <ReportButton targetType="post" targetId={post.id} />
@@ -93,26 +95,34 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
           <section className="mt-12 border-t border-[var(--qf-line)] pt-8">
             <h2 className="flex items-center gap-1.5 font-display text-lg font-semibold text-[var(--qf-ink)]">
               <MessageCircle size={16} />
-              {replies.length} {replies.length === 1 ? "Reply" : "Replies"}
+              {replies.length === 0
+                ? "Discussion"
+                : `${replies.length} ${replies.length === 1 ? "Reply" : "Replies"}`}
             </h2>
 
-            <div className="mt-5 space-y-5">
-              {replies.map((reply) => (
-                <div key={reply.id} className="border-b border-[var(--qf-line)] pb-5 last:border-0">
-                  <p className="whitespace-pre-wrap text-[14.5px] leading-relaxed text-[var(--qf-ink)]">
-                    {reply.body}
-                  </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
-                    <span>{reply.author_display_name}</span>
-                    <span aria-hidden>·</span>
-                    <span>{formatDate(reply.created_at)}</span>
-                    <span aria-hidden>·</span>
-                    <ReportButton targetType="reply" targetId={reply.id} />
-                    <ReplyOwnerControls replyId={reply.id} authorId={reply.author_id} initialBody={reply.body} />
+            {replies.length === 0 ? (
+              <p className="mt-4 text-[14.5px] text-[var(--qf-ink-soft)]">
+                No replies yet. Be the first to add to the discussion.
+              </p>
+            ) : (
+              <div className="mt-5 space-y-5">
+                {replies.map((reply) => (
+                  <div key={reply.id} className="border-b border-[var(--qf-line)] pb-5 last:border-0">
+                    <p className="whitespace-pre-wrap text-[14.5px] leading-relaxed text-[var(--qf-ink)]">
+                      {reply.body}
+                    </p>
+                    <div className="mt-2 flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
+                      <span>{reply.author_display_name}</span>
+                      <span aria-hidden>·</span>
+                      <span>{formatDate(reply.created_at)}</span>
+                      <span aria-hidden>·</span>
+                      <ReportButton targetType="reply" targetId={reply.id} />
+                      <ReplyOwnerControls replyId={reply.id} authorId={reply.author_id} initialBody={reply.body} />
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
 
             <div className="mt-8">
               <ReplyForm postId={post.id} />

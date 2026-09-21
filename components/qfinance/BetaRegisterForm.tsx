@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, FormEvent } from "react";
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 
 type Status = "idle" | "submitting" | "success" | "duplicate" | "error";
 
@@ -50,13 +52,20 @@ export default function BetaRegisterForm() {
     return (
       <div className="rounded-xl border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-8 text-center">
         <p className="font-display text-lg font-semibold text-[var(--qf-ink)]">
-          {status === "duplicate" ? "You're already on the list" : "You're on the list"}
+          {status === "duplicate" ? "You're already on the beta list" : "You're on the QFinera beta list."}
         </p>
         <p className="mt-2 text-[15px] leading-relaxed text-[var(--qf-ink-soft)]">
           {status === "duplicate"
             ? "This email is already registered — no need to sign up again."
-            : "We'll email you when QFinera beta access opens. In the meantime, the Beginner Journey is already live and free."}
+            : "Your registration has been received. We'll contact you at your registered email when your access is ready."}
         </p>
+        <Link
+          href="/qfinera/community"
+          className="mt-5 inline-flex items-center gap-1.5 font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline"
+        >
+          Explore QFinera Community
+          <ArrowRight size={14} />
+        </Link>
       </div>
     );
   }

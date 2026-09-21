@@ -12,11 +12,17 @@ function timeAgo(dateStr: string) {
   return `${months}mo ago`;
 }
 
+function replyCountLabel(count: number) {
+  if (count === 0) return "Join the discussion";
+  if (count === 1) return "1 reply";
+  return `${count} replies`;
+}
+
 export default function PostCard({ post }: { post: QFinancePost }) {
   return (
     <Link
       href={`/qfinera/community/${post.id}`}
-      className="block rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-colors hover:border-[var(--qf-brass)]"
+      className="block rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-all duration-200 hover:-translate-y-0.5 hover:border-[var(--qf-brass)] hover:shadow-sm active:translate-y-0 active:shadow-none"
     >
       <div className="flex items-center gap-2">
         <span className="rounded-full border border-[var(--qf-line)] px-2.5 py-0.5 text-[11.5px] font-medium text-[var(--qf-ink-soft)]">
@@ -38,7 +44,7 @@ export default function PostCard({ post }: { post: QFinancePost }) {
         <span aria-hidden>·</span>
         <span className="flex items-center gap-1">
           <MessageCircle size={13} />
-          {post.reply_count} {post.reply_count === 1 ? "reply" : "replies"}
+          {replyCountLabel(post.reply_count)}
         </span>
       </div>
     </Link>

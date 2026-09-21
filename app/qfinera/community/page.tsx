@@ -59,10 +59,10 @@ export default async function CommunityPage({
             <div className="rounded-md border border-dashed border-[var(--qf-line)] p-10 text-center">
               <MessageCircleQuestion size={28} className="mx-auto text-[var(--qf-ink-soft)]" />
               <p className="mt-3 font-display text-lg font-semibold text-[var(--qf-ink)]">
-                {category ? `No questions in ${category} yet.` : "Be the first to ask."}
+                {category ? `No questions in ${category} yet.` : "Nothing to discuss yet."}
               </p>
               <p className="mt-1.5 text-[14px] text-[var(--qf-ink-soft)]">
-                Start with something you&apos;ve always wondered about investing.
+                {category ? "Try a different category, or ask something new." : "Ask something you’ve been wondering about."}
               </p>
             </div>
           ) : (
@@ -94,7 +94,7 @@ export default async function CommunityPage({
 
         {total > 0 && (
           <p className="mt-4 text-center text-[12.5px] text-[var(--qf-ink-soft)]">
-            {total} {total === 1 ? "question" : "questions"}
+            {total} {total === 1 ? "question" : "questions"} to explore
           </p>
         )}
 

@@ -8,21 +8,21 @@ export default function QFinanceFooter() {
         <p className="text-[13px] text-[var(--qf-ink-soft)]">
           © {new Date().getFullYear()} {qfinanceConfig.name}, by QCyberIndia
         </p>
-        <div className="flex items-center gap-5">
+        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 sm:justify-end">
+          <Link href="/qfinera/community" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+            Community
+          </Link>
           <Link href="/qfinera/learn/beginner" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
             Learn
           </Link>
-          <Link href="/qfinera/community" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
-            Community
+          <Link href="/qfinera/why-india-investing" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+            Why India Is Investing
           </Link>
           <Link href="/qfinera/about" className="text-[13px] text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
             About
           </Link>
         </div>
       </div>
-      <p className="mx-auto mt-4 max-w-md text-center text-[12.5px] leading-relaxed text-[var(--qf-ink-soft)] sm:text-left">
-        
-      </p>
     </footer>
   );
 }

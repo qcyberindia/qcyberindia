@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendEmail } from "@/lib/email";
+import { buildQFinanceBetaEmail } from "@/lib/qfinance-beta-email";
 import { insertQFinanceRegistration, isDbConfigured } from "@/lib/db";
 import { siteConfig } from "@/lib/site-config";
+import { qfinanceConfig } from "@/lib/qfinance-config";
 
 // Public registration endpoint for /qfinance/beta. Mirrors app/api/qbids/route.ts's
 // pattern (honeypot, validation, duplicate-is-not-an-error, DB-first-then-email)
@@ -64,7 +66,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, duplicate: true });
   }
 
-  const result = await sendEmail({
+  // Internal notification — not user-facing, so mentioning the table name
+  // here is fine; this email never reaches the registrant.
+  const adminResult = await sendEmail({
     to: siteConfig.email.info,
     from: `noreply@${siteConfig.domain}`,
     replyTo: email,
@@ -79,10 +83,31 @@ export async function POST(req: NextRequest) {
     ].join("\n"),
   });
 
-  if (!result.ok) {
-    console.error("QFinance registration email error:", result.error);
+  if (!adminResult.ok) {
+    console.error("QFinance registration admin-notify email error:", adminResult.error);
+  }
+
+  // User-facing confirmation — a real branded email, not the internal alert
+  // above. Failure here doesn't fail the registration itself (the DB write
+  // already succeeded, or DB is unconfigured and we already warned above);
+  // it's logged so a delivery problem is visible without blocking the user.
+  const { subject, text, html } = buildQFinanceBetaEmail({
+    name,
+    communityUrl: `https://${siteConfig.domain}${qfinanceConfig.path}/community`,
+    supportEmail: siteConfig.email.support,
+  });
+  const confirmationResult = await sendEmail({
+    to: email,
+    from: `noreply@${siteConfig.domain}`,
+    subject,
+    text,
+    html,
+  });
+
+  if (!confirmationResult.ok) {
+    console.error("QFinance beta confirmation email error:", confirmationResult.error);
     if (!isDbConfigured()) {
-      return NextResponse.json({ ok: false, error: result.error ?? "Unknown email error" }, { status: 502 });
+      return NextResponse.json({ ok: false, error: confirmationResult.error ?? "Unknown email error" }, { status: 502 });
     }
   }
 

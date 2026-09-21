@@ -21,13 +21,13 @@ export default function PostOwnerControls({
   postId: number;
   authorId: number;
   initialTitle: string;
-  initialBody: string;
+  initialBody: string | null;
 }) {
   const { user } = useCommunityAuth();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(initialTitle);
-  const [body, setBody] = useState(initialBody);
+  const [body, setBody] = useState(initialBody ?? "");
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
@@ -87,7 +87,14 @@ export default function PostOwnerControls({
         </div>
         <div className="mt-3 space-y-2.5">
           <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={150} required className={inputClass} />
-          <textarea value={body} onChange={(e) => setBody(e.target.value)} maxLength={4000} required rows={5} className={`${inputClass} resize-y`} />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            maxLength={4000}
+            rows={5}
+            placeholder="Add context if you want…"
+            className={`${inputClass} resize-y`}
+          />
         </div>
         {error && <p className="mt-2 text-[13px] text-[var(--qf-down)]">{error}</p>}
         <div className="mt-3 flex items-center gap-2.5">
