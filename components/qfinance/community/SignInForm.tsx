@@ -55,6 +55,17 @@ export default function SignInForm({ prompt = "Sign in to continue" }: { prompt?
               We sent a secure sign-in link to <strong className="text-[var(--qf-ink)]">{email}</strong>.
               It expires in 15 minutes and can only be used once.
             </p>
+            <p className="mt-2 text-[12.5px] text-[var(--qf-ink-soft)]">
+              Don&apos;t see it? Check your spam folder, or{" "}
+              <button
+                type="button"
+                onClick={() => setStatus("idle")}
+                className="font-semibold text-[var(--qf-brass-dark)] underline underline-offset-2"
+              >
+                try again
+              </button>
+              .
+            </p>
           </div>
         </div>
       </div>

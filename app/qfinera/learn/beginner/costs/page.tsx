@@ -119,16 +119,13 @@ export default function ChapterCostsPage() {
           href={next ? `/qfinera/learn/beginner/${next.slug}` : "/qfinera/learn/beginner"}
         />
 
-        <div className="mt-6 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 text-center">
-          <p className="text-xs font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">Still confused?</p>
-          <p className="mt-1.5 font-display text-[15px] font-semibold text-[var(--qf-ink)]">Ask the QFinera community.</p>
-          <Link
-            href="/qfinera/community"
-            className="mt-3 inline-flex items-center gap-1.5 font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline"
-          >
-            Explore Community
-            <ArrowRight size={14} />
-          </Link>
+        <div className="mt-6 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-4 text-center">
+          <p className="text-[13px] text-[var(--qf-ink-soft)]">
+            Still confused?{" "}
+            <Link href="/qfinera/community" className="font-semibold text-[var(--qf-brass-dark)] hover:underline">
+              Ask the QFinera community
+            </Link>
+          </p>
         </div>
 
         <div className="mt-8 flex items-center justify-between text-sm">
@@ -138,11 +135,22 @@ export default function ChapterCostsPage() {
               {prev.title}
             </Link>
           ) : (
-            <span />
+            <Link href="/qfinera/learn/beginner" className="inline-flex items-center gap-1.5 text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
+              <ArrowLeft size={13} />
+              Journey Map
+            </Link>
           )}
-          <Link href="/qfinera/learn/beginner" className="text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]">
-            Journey Map
-          </Link>
+          {next ? (
+            <Link href={`/qfinera/learn/beginner/${next.slug}`} className="inline-flex items-center gap-1.5 font-semibold text-[var(--qf-brass-dark)] hover:underline">
+              Next: {next.title}
+              <ArrowRight size={13} />
+            </Link>
+          ) : (
+            <Link href="/qfinera/learn/beginner" className="inline-flex items-center gap-1.5 font-semibold text-[var(--qf-brass-dark)] hover:underline">
+              Journey Map
+              <ArrowRight size={13} />
+            </Link>
+          )}
         </div>
       </LearningSection>
 
