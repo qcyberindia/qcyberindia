@@ -10,10 +10,7 @@ import ReplyForm from "@/components/qfinance/community/ReplyForm";
 import ReportButton from "@/components/qfinance/community/ReportButton";
 import PostOwnerControls from "@/components/qfinance/community/PostOwnerControls";
 import ReplyOwnerControls from "@/components/qfinance/community/ReplyOwnerControls";
-
-function formatDate(dateStr: string) {
-  return new Date(dateStr).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
-}
+import RelativeTime from "@/components/qfinance/community/RelativeTime";
 
 export async function generateMetadata({
   params,
@@ -77,7 +74,7 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
             <div className="mt-2.5 flex items-center gap-3 text-[13px] text-[var(--qf-ink-soft)]">
               <span>{post.author_display_name}</span>
               <span aria-hidden>·</span>
-              <span>{formatDate(post.created_at)}</span>
+              <RelativeTime iso={post.created_at} />
             </div>
 
             {post.body && (
@@ -114,7 +111,7 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
                     <div className="mt-2 flex flex-wrap items-center gap-3 text-[12.5px] text-[var(--qf-ink-soft)]">
                       <span>{reply.author_display_name}</span>
                       <span aria-hidden>·</span>
-                      <span>{formatDate(reply.created_at)}</span>
+                      <RelativeTime iso={reply.created_at} />
                       <span aria-hidden>·</span>
                       <ReportButton targetType="reply" targetId={reply.id} />
                       <ReplyOwnerControls replyId={reply.id} authorId={reply.author_id} initialBody={reply.body} />

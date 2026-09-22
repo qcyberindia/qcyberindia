@@ -1,16 +1,7 @@
 import Link from "next/link";
 import { MessageCircle, ArrowRight } from "lucide-react";
 import type { QFinancePost } from "@/lib/db";
-
-function timeAgo(dateStr: string) {
-  const diffMs = Date.now() - new Date(dateStr).getTime();
-  const days = Math.floor(diffMs / 86400000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
-}
+import RelativeTime from "./RelativeTime";
 
 function replyCountText(count: number) {
   if (count === 0) return "0 replies";
@@ -44,7 +35,7 @@ export default function PostCard({ post }: { post: QFinancePost }) {
       <div className="mt-2.5 flex items-center gap-2.5 text-[13px] text-[var(--qf-ink-soft)]">
         <span>{post.author_display_name}</span>
         <span aria-hidden>·</span>
-        <span>{timeAgo(post.created_at)}</span>
+        <RelativeTime iso={post.created_at} />
       </div>
 
       {/* Bottom row: real reply count as plain info, CTA as a visually
