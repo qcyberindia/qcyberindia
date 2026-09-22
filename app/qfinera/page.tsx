@@ -12,6 +12,17 @@ import Reveal from "@/components/Reveal";
 // exact same listQFinanceCommunityPosts() the /qfinera/community page uses,
 // and renders results with the same PostCard component, so this is a
 // second *view* of Community, not a second Community implementation.
+//
+// force-dynamic: this page has no searchParams/cookies/headers usage and
+// queries Postgres directly (not via fetch()), so nothing here would
+// otherwise signal Next's App Router to skip static rendering — it was
+// being served from the Full Route Cache as a stale HTML snapshot from
+// whenever it first built/rendered, even though the underlying data (new
+// posts, updated reply counts) had changed. /qfinera/community doesn't
+// have this problem only because reading its `searchParams` prop already
+// opts it into per-request dynamic rendering automatically; this page had
+// no equivalent signal, so it needs this explicitly.
+export const dynamic = "force-dynamic";
 
 const roadmap = [
   {
