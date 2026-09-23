@@ -466,6 +466,112 @@ the public QFinance product the no-monospace rule is scoped to, so left as-is.)
 
 ---
 
+## Session 20 — Reply-notification email system for QFinance Community
+
+### What was built
+- **`db/migrations/005_qfinance_thread_notification_preferences.sql`** (new) —
+  minimal per-thread mute table (`post_id`, `user_id`, `muted_at`,
+  unique constraint). Absence of a row = notified (the default).
+- **`lib/db.ts`**: added the same table to `ensureQFinanceCommunityTables`'s
+  runtime fallback; added `getQFinanceReplyNotificationRecipients(postId,
+  actorUserId)`, `isQFinanceThreadMuted`, `setQFinanceThreadMute`.
+- **`lib/qfinance-beta-email.ts`**: exported `escapeHtml` (was private) for
+  reuse; added `buildQFinanceReplyNotificationEmail`, built from the exact
+  same `emailHeader`/`emailFooter`/`emailShell`/`COLORS` the beta and
+  magic-link emails already use — no new visual language introduced.
+- **`lib/qfinance-community-notifications.ts`** (new) —
+  `sendQFinanceReplyNotifications(postId, replyId, actorUserId,
+  actorDisplayName, replyBody)`: the only place that decides who gets
+  emailed and sends it.
+- **`app/api/qfinance/community/posts/[id]/replies/route.ts`**: calls the
+  above, wrapped in try/catch, only after `createQFinanceCommunityReply`
+  has already returned success.
+
+### Recipient algorithm
+Entirely one SQL query in `getQFinanceReplyNotificationRecipients`:
+```
+owner ∪ previous published repliers
+  − actor (excluded by id, always)
+  − anyone who muted this thread (LEFT exclusion join)
+  ∩ status = 'active' users only (excludes suspended/deleted)
+DISTINCT on user id
+```
+Doing dedup/exclusion in SQL (`DISTINCT`, `!=`, `NOT IN`) rather than in
+application code means there's exactly one code path to get right, not two
+that need to agree. Verified against all four spec test cases by tracing
+the query logic:
+- Owner replies to their own post → excluded by the `id != actorUserId` filter.
+- Owner is also a previous replier → appears once in the `UNION`, `DISTINCT` collapses any duplicate.
+- A user who replied twice → still one row per user id, not per reply.
+- A muted user → excluded by the `NOT IN` subquery regardless of owner/replier status.
+
+### Email template reused, not reinvented
+`buildQFinanceReplyNotificationEmail` calls the same private
+`emailHeader()`/`emailFooter()`/`emailShell()` functions the beta and
+magic-link templates use — same fonts, colors, card treatment, CTA button
+style, footer. Only the body content is new. Subject: `[QFinera] {name}
+replied to your discussion`. Body: question title in a bordered card, an
+escaped 160-char reply preview with a brass left-border accent, a "View
+discussion" CTA, and the required "you're receiving this because you
+participated" line. No email addresses, no portfolio/broker data, ever in
+this template.
+
+### Error handling / isolation from reply creation
+Three independent layers, not just one:
+1. `sendQFinanceReplyNotifications` itself never throws — recipient-lookup
+   failure is caught and logged, returns early; the actual email sends use
+   `Promise.allSettled` so one bad address can't stop the others, and each
+   result (rejected promise or `{ok:false}`) is logged individually.
+2. The replies route wraps the whole call in try/catch anyway, as defense
+   in depth — matching the existing pattern in `app/api/qfinance/route.ts`.
+3. The call only happens after `createQFinanceCommunityReply` has already
+   returned `{ok:true}` — notifications can never run before the reply is
+   confirmed persisted, and can never affect the response back to the
+   replier either way.
+
+### Security
+- `escapeHtml` applied to `replyAuthor`, `postTitle`, and the reply preview
+  before any HTML interpolation — confirmed by reading the final function,
+  every user-generated value passed to the template goes through it first.
+- Recipient identity comes exclusively from `session.userId`/
+  `session.displayName` (the verified cookie) and the DB-computed recipient
+  list — the client never supplies a recipient, a role, or another user's id.
+- Admin/QFinera Team posts and replies use `qfinance_users` rows like any
+  other member (no separate admin-authoring path exists in Community), so
+  they go through this exact same notification code with no special case.
+
+### Mute — prepared, not exposed
+Per this task's explicit "prepare for later, don't expand scope": the DB
+layer (`isQFinanceThreadMuted`/`setQFinanceThreadMute`) and the email
+template's optional `muteUrl` parameter both exist and work, but no API
+route or UI toggle was built this session — `sendQFinanceReplyNotifications`
+currently calls the email builder without a `muteUrl`, so the template
+simply renders without that line. Adding the toggle later is additive
+(one new route + one small UI control), not a rearchitecture.
+
+### NOT done / NOT verified
+- `npm run lint` / `rm -rf .next && npm run build` / `git diff --check` —
+  **not run**. No shell access in this environment, the same standing
+  limitation as every session in this log.
+- No live email was sent or received — the four test cases above were
+  verified by reading the SQL logic, not by exercising the running system.
+- The pre-existing magic-link email's claim "can only be used once" is
+  still inaccurate (tokens are stateless, checked for signature+expiry
+  only — see Session 15's audit) — unrelated to this task, not fixed here,
+  flagging again since it's still true.
+
+### Next
+1. Run `npm run lint`, `rm -rf .next && npm run build`, `git diff --check`
+   — unchanged top priority every session.
+2. If/when thread mute gets a UI: one route (`POST
+   /api/qfinance/community/posts/[id]/mute`, session-gated, calling
+   `setQFinanceThreadMute`) and a small secondary control in the thread
+   view, per the original brief's "not a prominent action" instruction.
+3. Manually trigger a reply on a seeded multi-participant thread once a
+   real environment is available, to confirm actual delivery end-to-end.
+
+---
+
 ## Session 19 — Marketing/SaaS terminology alignment audit (read-first, small justified copy fixes only)
 
 ### Scope

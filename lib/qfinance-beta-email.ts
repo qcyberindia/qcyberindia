@@ -14,7 +14,7 @@ const COLORS = {
   line: "#D8CBA9",
 };
 
-function escapeHtml(value: string) {
+export function escapeHtml(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
@@ -155,6 +155,107 @@ export function buildQFinanceBetaEmail({
                   </td>
                 </tr>
               </table>
+            </td>
+          </tr>`;
+
+  const html = emailShell(emailHeader() + body + emailFooter(supportEmail), subject);
+
+  return { subject, text, html };
+}
+
+// Reply-notification email — sent to a discussion's owner and previous
+// repliers (never the person who just replied) when a new reply lands.
+// Reuses the same shell/header/footer as the other two templates in this
+// file so all three transactional emails read as one product. `replyAuthor`
+// and `postTitle` are always escaped before interpolation — both are
+// user-generated content (a display name, a question title).
+export function buildQFinanceReplyNotificationEmail({
+  recipientName,
+  replyAuthor,
+  postTitle,
+  replyPreview,
+  discussionUrl,
+  muteUrl,
+  supportEmail,
+}: {
+  recipientName: string;
+  replyAuthor: string;
+  postTitle: string;
+  /** Already truncated by the caller — this function only escapes, it
+   * doesn't decide the length. */
+  replyPreview: string;
+  discussionUrl: string;
+  muteUrl?: string;
+  supportEmail: string;
+}): { subject: string; text: string; html: string } {
+  const safeRecipientName = escapeHtml(recipientName.trim() || "there");
+  const firstName = safeRecipientName.split(/\s+/)[0];
+  const safeReplyAuthor = escapeHtml(replyAuthor.trim() || "Someone");
+  const safePostTitle = escapeHtml(postTitle.trim() || "a QFinera discussion");
+  const safePreview = escapeHtml(replyPreview.trim());
+
+  const subject = `[QFinera] ${safeReplyAuthor.replace(/&#039;/g, "'")} replied to your discussion`;
+
+  const text = [
+    `Hi ${firstName},`,
+    "",
+    `${replyAuthor} replied to a QFinera discussion you're part of:`,
+    "",
+    `"${postTitle}"`,
+    "",
+    replyPreview ? `${replyAuthor} wrote:\n${replyPreview}` : "",
+    "",
+    `View the discussion: ${discussionUrl}`,
+    "",
+    "You're receiving this because you participated in this QFinera discussion.",
+    muteUrl ? `Mute this discussion: ${muteUrl}` : "",
+    "",
+    "— QFinera, a product by QCyberIndia",
+    `Questions? ${supportEmail}`,
+  ]
+    .filter((line, i, arr) => !(line === "" && arr[i - 1] === "")) // collapse doubled blank lines when replyPreview/muteUrl are empty
+    .join("\n");
+
+  const body = `
+          <tr>
+            <td style="padding: 32px; font-family: Arial, Helvetica, sans-serif;">
+              <p style="margin: 0 0 16px; font-size: 15px; line-height: 1.6; color: ${COLORS.ink};">
+                Hi ${firstName},
+              </p>
+              <p style="margin: 0 0 20px; font-size: 14.5px; line-height: 1.65; color: ${COLORS.inkSoft};">
+                <strong style="color: ${COLORS.ink};">${safeReplyAuthor}</strong> replied to a QFinera discussion
+                you&#39;re part of:
+              </p>
+
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: ${COLORS.cream1}; border: 1px solid ${COLORS.line}; border-radius: 6px; margin: 0 0 20px;">
+                <tr>
+                  <td style="padding: 18px 20px;">
+                    <p style="margin: 0 0 10px; font-size: 15px; font-weight: 700; line-height: 1.4; color: ${COLORS.ink};">
+                      ${safePostTitle}
+                    </p>
+                    ${
+                      safePreview
+                        ? `<p style="margin: 0; font-size: 13.5px; line-height: 1.6; color: ${COLORS.inkSoft}; border-left: 2px solid ${COLORS.brass}; padding-left: 12px;">${safePreview}</p>`
+                        : ""
+                    }
+                  </td>
+                </tr>
+              </table>
+
+              <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 0 24px;">
+                <tr>
+                  <td style="border-radius: 4px; background-color: ${COLORS.brass};">
+                    <a href="${discussionUrl}" style="display: inline-block; padding: 13px 26px; font-family: Arial, Helvetica, sans-serif; font-size: 14px; font-weight: 700; color: ${COLORS.cream0}; text-decoration: none;">
+                      View discussion
+                    </a>
+                  </td>
+                </tr>
+              </table>
+
+              <p style="margin: 0; font-size: 12.5px; line-height: 1.6; color: ${COLORS.inkSoft};">
+                You&#39;re receiving this because you participated in this QFinera discussion.
+                ${muteUrl ? `<a href="${muteUrl}" style="color: ${COLORS.brassDark};">Mute this discussion</a>.` : ""}
+              </p>
             </td>
           </tr>`;
 

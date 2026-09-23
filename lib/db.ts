@@ -219,6 +219,16 @@ export async function ensureQFinanceCommunityTables(): Promise<void> {
     -- it: makes body optional even on an already-existing table. A no-op if
     -- the column is already nullable.
     ALTER TABLE qfinance_community_posts ALTER COLUMN body DROP NOT NULL;
+
+    -- Runtime fallback for the 005 migration (thread reply-notification mute).
+    CREATE TABLE IF NOT EXISTS qfinance_community_thread_notification_preferences (
+      post_id INTEGER NOT NULL REFERENCES qfinance_community_posts(id),
+      user_id INTEGER NOT NULL REFERENCES qfinance_users(id),
+      muted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (post_id, user_id)
+    );
+    CREATE INDEX IF NOT EXISTS idx_qf_thread_mute_post_user
+      ON qfinance_community_thread_notification_preferences (post_id, user_id);
   `);
 }
 
@@ -487,6 +497,88 @@ export async function createQFinanceCommunityReply(input: {
     [input.authorId, input.postId, body]
   );
   return { ok: true, id: rows[0].id };
+}
+
+// --- Reply notification recipients -----------------------------------------
+// Owner + everyone who has previously replied (published replies only),
+// deduplicated by user id, minus the person who just triggered this reply
+// and minus anyone who muted this specific thread. Joining to qfinance_users
+// with status = 'active' means a suspended/deleted user is silently
+// excluded — no separate "is this recipient still valid" check needed at
+// the call site.
+export type QFinanceNotificationRecipient = { id: number; email: string; display_name: string };
+
+export async function getQFinanceReplyNotificationRecipients(
+  postId: number,
+  actorUserId: number
+): Promise<{ postTitle: string; recipients: QFinanceNotificationRecipient[] }> {
+  const p = getPool();
+  if (!p) return { postTitle: "", recipients: [] };
+
+  await ensureQFinanceCommunityTables();
+
+  const postRes = await p.query(
+    `SELECT title FROM qfinance_community_posts WHERE id = $1`,
+    [postId]
+  );
+  const postTitle: string = postRes.rows[0]?.title ?? "";
+
+  const { rows } = await p.query(
+    `SELECT DISTINCT u.id, u.email, u.display_name
+     FROM qfinance_users u
+     WHERE u.status = 'active'
+       AND u.id != $2
+       AND u.id NOT IN (
+         SELECT user_id FROM qfinance_community_thread_notification_preferences
+         WHERE post_id = $1
+       )
+       AND u.id IN (
+         -- the question's owner
+         SELECT author_id FROM qfinance_community_posts WHERE id = $1
+         UNION
+         -- everyone who has published a reply on this post
+         SELECT author_id FROM qfinance_community_replies WHERE post_id = $1 AND status = 'published'
+       )`,
+    [postId, actorUserId]
+  );
+
+  return { postTitle, recipients: rows };
+}
+
+export async function isQFinanceThreadMuted(postId: number, userId: number): Promise<boolean> {
+  const p = getPool();
+  if (!p) return false;
+  await ensureQFinanceCommunityTables();
+  const { rows } = await p.query(
+    `SELECT 1 FROM qfinance_community_thread_notification_preferences WHERE post_id = $1 AND user_id = $2`,
+    [postId, userId]
+  );
+  return rows.length > 0;
+}
+
+export async function setQFinanceThreadMute(
+  postId: number,
+  userId: number,
+  muted: boolean
+): Promise<{ ok: boolean; error?: string }> {
+  const p = getPool();
+  if (!p) return { ok: false, error: "Database is not configured." };
+
+  await ensureQFinanceCommunityTables();
+
+  if (muted) {
+    await p.query(
+      `INSERT INTO qfinance_community_thread_notification_preferences (post_id, user_id)
+       VALUES ($1, $2) ON CONFLICT (post_id, user_id) DO NOTHING`,
+      [postId, userId]
+    );
+  } else {
+    await p.query(
+      `DELETE FROM qfinance_community_thread_notification_preferences WHERE post_id = $1 AND user_id = $2`,
+      [postId, userId]
+    );
+  }
+  return { ok: true };
 }
 
 export type ReportReason = "spam" | "scam" | "harassment" | "misleading_claim" | "personal_info" | "other";
