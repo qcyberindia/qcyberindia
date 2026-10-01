@@ -1,4 +1,4 @@
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 
 // Lazily-created singleton pool, mirroring lib/email.ts's pattern: if
 // DATABASE_URL isn't set, every function here becomes a safe no-op instead
@@ -31,6 +31,41 @@ function getPool(): Pool | null {
 
 export function isDbConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL);
+}
+
+// Runs `fn` inside a single PostgreSQL transaction: BEGIN -> fn -> COMMIT,
+// or ROLLBACK (and rethrow) if fn throws. Used by every NAV-affecting
+// QFinera Fund operation. Unlike the helpers above, this does NOT silently
+// no-op when the database is missing: money must never appear to succeed
+// without being written, so an unconfigured database is an error here.
+//
+// Convention for accounting callers: take the fund-level lock first inside
+// `fn` (SELECT id FROM qfinera_funds WHERE id = $1 FOR UPDATE) so that
+// concurrent contributions/withdrawals/trades for one fund serialize.
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const p = getPool();
+  if (!p) {
+    throw new Error("Database is not configured (DATABASE_URL missing).");
+  }
+
+  const client = await p.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch {
+      // Rollback failed (e.g. connection already dead); surface the original error.
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // Creates the qbids_registrations table if it doesn't exist yet. Safe to
