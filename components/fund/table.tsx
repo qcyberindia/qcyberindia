@@ -44,7 +44,7 @@ export function MobileDataCard<T>({
   const rest = columns.filter((c) => c !== primary && !c.hideOnMobile);
   const title = primary.cell(row);
   return (
-    <li className="rounded-lg border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-4">
+    <li className="rounded-xl border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-4 transition-colors hover:border-[var(--qf-brass)]/60">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 font-display text-[15px] font-semibold text-[var(--qf-ink)]">
           {href ? (
@@ -57,11 +57,11 @@ export function MobileDataCard<T>({
         </div>
         {action}
       </div>
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 text-[13px]">
+      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2.5 border-t border-[var(--qf-line)]/70 pt-3 text-[13px]">
         {rest.map((c) => (
           <div key={c.key} className="min-w-0">
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">{c.header}</dt>
-            <dd className="mt-0.5 break-words text-[var(--qf-ink)]">{c.cell(row)}</dd>
+            <dt className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--qf-ink-soft)]">{c.header}</dt>
+            <dd className={`mt-0.5 break-words text-[var(--qf-ink)] ${c.align === "right" ? "tabular-nums" : ""}`}>{c.cell(row)}</dd>
           </div>
         ))}
       </dl>
@@ -81,12 +81,12 @@ export function DataTable<T>({ columns, rows, rowKey, rowHref, caption, rowActio
         <table className="w-full border-collapse text-left text-[13.5px]">
           <caption className="sr-only">{caption}</caption>
           <thead>
-            <tr className="border-b border-[var(--qf-line)] bg-[var(--qf-cream-1)]">
+            <tr className="border-b border-[var(--qf-line)] bg-[var(--qf-cream-1)]/70">
               {columns.map((c) => (
                 <th
                   key={c.key}
                   scope="col"
-                  className={`whitespace-nowrap px-4 py-2.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)] ${
+                  className={`whitespace-nowrap px-4 py-2.5 text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--qf-ink-soft)] first:pl-5 last:pr-5 ${
                     c.align === "right" ? "text-right" : ""
                   }`}
                 >
@@ -104,13 +104,13 @@ export function DataTable<T>({ columns, rows, rowKey, rowHref, caption, rowActio
             {rows.map((row) => {
               const href = rowHref?.(row);
               return (
-                <tr key={rowKey(row)} className="border-b border-[var(--qf-line)] last:border-b-0 hover:bg-[var(--qf-cream-1)]/60">
+                <tr key={rowKey(row)} className="border-b border-[var(--qf-line)]/70 transition-colors last:border-b-0 hover:bg-[var(--qf-cream-1)]/70">
                   {columns.map((c) => {
                     const content = c.cell(row);
                     return (
-                      <td key={c.key} className={`px-4 py-3 align-top text-[var(--qf-ink)] ${c.align === "right" ? "text-right" : ""}`}>
+                      <td key={c.key} className={`px-4 py-3 align-middle text-[var(--qf-ink)] first:pl-5 last:pr-5 ${c.align === "right" ? "text-right tabular-nums" : ""}`}>
                         {href && c.key === primaryKey ? (
-                          <Link href={href} className="font-semibold underline-offset-2 hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]">
+                          <Link href={href} className="font-semibold decoration-[var(--qf-brass)] underline-offset-4 hover:text-[var(--qf-brass-dark)] hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]">
                             {content}
                           </Link>
                         ) : (
@@ -119,7 +119,7 @@ export function DataTable<T>({ columns, rows, rowKey, rowHref, caption, rowActio
                       </td>
                     );
                   })}
-                  {rowAction && <td className="px-4 py-3 text-right align-top">{rowAction(row)}</td>}
+                  {rowAction && <td className="px-4 py-3 pr-5 text-right align-middle">{rowAction(row)}</td>}
                 </tr>
               );
             })}
@@ -182,7 +182,7 @@ export function FilterBar({
   dirty?: boolean;
 }) {
   return (
-    <div role="search" className="mb-4 flex flex-wrap items-end gap-3 rounded-lg border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-3 sm:p-4">
+    <div role="search" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--qf-line)] bg-[var(--qf-cream-1)]/50 p-3 sm:p-4">
       {children}
       {onReset && dirty && (
         <button type="button" onClick={onReset} className={btnSecondary}>

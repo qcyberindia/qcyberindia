@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { cache } from "react";
 import Link from "next/link";
 import { MessageCircle, ArrowLeft } from "lucide-react";
 import { getQFinanceCommunityPost } from "@/lib/db";
@@ -12,13 +13,16 @@ import PostOwnerControls from "@/components/qfinance/community/PostOwnerControls
 import ReplyOwnerControls from "@/components/qfinance/community/ReplyOwnerControls";
 import RelativeTime from "@/components/qfinance/community/RelativeTime";
 
+// generateMetadata and the page both need the post: one query per request.
+const getPost = cache((id: number) => getQFinanceCommunityPost(id));
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const result = await getQFinanceCommunityPost(Number(id));
+  const result = Number.isInteger(Number(id)) ? await getPost(Number(id)) : null;
   // A hidden/removed/nonexistent post gets the same generic metadata as a
   // real 404 - nothing here should reveal whether a non-public post exists.
   if (!result) {
@@ -36,7 +40,7 @@ export default async function CommunityPostPage({ params }: { params: Promise<{ 
   const postId = Number(id);
   if (!Number.isInteger(postId)) notFound();
 
-  const result = await getQFinanceCommunityPost(postId);
+  const result = await getPost(postId);
   if (!result) notFound();
 
   const { post, replies } = result;

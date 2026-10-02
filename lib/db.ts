@@ -203,10 +203,23 @@ export async function insertQbidsRegistration(
 // is an idempotent runtime fallback for the same reason ensureQbidsTable is.
 // ---------------------------------------------------------------------------
 
-export async function ensureQFinanceCommunityTables(): Promise<void> {
-  const p = getPool();
-  if (!p) return;
+// The schema fallback only needs to succeed once per server process. Running
+// it on every read cost a multi-statement DDL round trip (and an ACCESS
+// EXCLUSIVE lock from the ALTER TABLE) on each Community / QFinera page view.
+// A failed attempt is forgotten so the next call retries.
+let communityTablesReady: Promise<void> | null = null;
 
+export function ensureQFinanceCommunityTables(): Promise<void> {
+  const p = getPool();
+  if (!p) return Promise.resolve();
+  communityTablesReady ??= createQFinanceCommunityTables(p).catch((err) => {
+    communityTablesReady = null;
+    throw err;
+  });
+  return communityTablesReady;
+}
+
+async function createQFinanceCommunityTables(p: Pool): Promise<void> {
   await p.query(`
     CREATE TABLE IF NOT EXISTS qfinance_users (
       id SERIAL PRIMARY KEY,
@@ -392,15 +405,12 @@ export async function listQFinanceCommunityPosts(opts: {
   const whereCategory = category ? `AND p.category = $2` : "";
   const params: (string | number)[] = category ? ["published", category] : ["published"];
 
-  const totalRes = await p.query(
-    `SELECT COUNT(*)::int AS count FROM qfinance_community_posts p WHERE p.status = $1 ${whereCategory}`,
-    params
-  );
-  const total = totalRes.rows[0]?.count ?? 0;
-  const pageCount = Math.max(1, Math.ceil(total / POSTS_PER_PAGE));
   const offset = (page - 1) * POSTS_PER_PAGE;
 
-  const { rows } = await p.query(
+  // Independent reads: run the count and the page together.
+  const [totalRes, { rows }] = await Promise.all([
+    p.query(`SELECT COUNT(*)::int AS count FROM qfinance_community_posts p WHERE p.status = $1 ${whereCategory}`, params),
+    p.query(
     `SELECT p.id, p.title, p.body, p.category, p.status, p.is_seed, p.created_at,
             u.display_name AS author_display_name,
             (SELECT COUNT(*)::int FROM qfinance_community_replies r WHERE r.post_id = p.id AND r.status = 'published') AS reply_count
@@ -409,8 +419,11 @@ export async function listQFinanceCommunityPosts(opts: {
      WHERE p.status = $1 ${whereCategory}
      ORDER BY p.created_at DESC
      LIMIT ${POSTS_PER_PAGE} OFFSET ${offset}`,
-    params
-  );
+      params
+    ),
+  ]);
+  const total = totalRes.rows[0]?.count ?? 0;
+  const pageCount = Math.max(1, Math.ceil(total / POSTS_PER_PAGE));
 
   return { posts: rows, total, page, pageCount };
 }
@@ -436,7 +449,10 @@ export async function getQFinanceCommunityPost(
 
   await ensureQFinanceCommunityTables();
 
-  const postRes = await p.query(
+  // Post and replies are fetched together; replies are only returned when the
+  // post itself is published, so a hidden post's replies never leave here.
+  const [postRes, repliesRes] = await Promise.all([
+    p.query(
     `SELECT p.id, p.title, p.body, p.category, p.status, p.is_seed, p.created_at, p.author_id,
             u.display_name AS author_display_name,
             (SELECT COUNT(*)::int FROM qfinance_community_replies r WHERE r.post_id = p.id AND r.status = 'published') AS reply_count
@@ -444,18 +460,18 @@ export async function getQFinanceCommunityPost(
      JOIN qfinance_users u ON u.id = p.author_id
      WHERE p.id = $1 AND p.status = 'published'`,
     [id]
-  );
-  const post = postRes.rows[0];
-  if (!post) return null;
-
-  const repliesRes = await p.query(
+    ),
+    p.query(
     `SELECT r.id, r.body, r.status, r.created_at, r.author_id, u.display_name AS author_display_name
      FROM qfinance_community_replies r
      JOIN qfinance_users u ON u.id = r.author_id
      WHERE r.post_id = $1 AND r.status = 'published'
      ORDER BY r.created_at ASC`,
     [id]
-  );
+    ),
+  ]);
+  const post = postRes.rows[0];
+  if (!post) return null;
 
   return { post, replies: repliesRes.rows };
 }

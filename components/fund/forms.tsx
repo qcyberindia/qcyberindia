@@ -1,6 +1,7 @@
 "use client";
 
 import { useId } from "react";
+import { AlertCircle } from "lucide-react";
 
 export const inputClass =
   "w-full min-h-10 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-3 py-2 text-[14.5px] text-[var(--qf-ink)] outline-none transition-colors placeholder:text-[var(--qf-ink-soft)]/60 focus:border-[var(--qf-brass)] focus:ring-2 focus:ring-[var(--qf-brass)]/15 disabled:opacity-60 aria-[invalid=true]:border-[var(--qf-down)]";
@@ -35,9 +36,17 @@ export function FormField({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">
-        {label}
-        {required && <span aria-hidden="true"> *</span>}
+      <label htmlFor={id} className="flex items-baseline justify-between gap-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">
+        <span>
+          {label}
+          {required && (
+            <span className="text-[var(--qf-brass-dark)]">
+              <span aria-hidden="true"> *</span>
+              <span className="sr-only"> (required)</span>
+            </span>
+          )}
+        </span>
+        {required === false && <span className="text-[10.5px] font-medium normal-case tracking-normal opacity-80">Optional</span>}
       </label>
       {children({ id, "aria-describedby": describedBy, "aria-invalid": error ? true : undefined })}
       {hint && !error && (
@@ -46,7 +55,8 @@ export function FormField({
         </p>
       )}
       {error && (
-        <p id={errorId} className="text-[12px] font-medium text-[var(--qf-down)]">
+        <p id={errorId} role="alert" className="flex items-start gap-1 text-[12px] font-medium text-[var(--qf-down)]">
+          <AlertCircle size={13} className="mt-px shrink-0" aria-hidden="true" />
           {error}
         </p>
       )}

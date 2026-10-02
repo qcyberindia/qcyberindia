@@ -17,11 +17,13 @@ import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import PostCard from "@/components/qfinance/community/PostCard";
 import AskQuestionButton from "@/components/qfinance/community/AskQuestionButton";
 import Reveal from "@/components/Reveal";
-import { getQFinanceServerSession } from "@/lib/qfinance-community-auth";
 
-// QFinera home: the gateway to every product area. Rendered per request
-// (live Community feed + whether the visitor is signed in).
-export const dynamic = "force-dynamic";
+// QFinera home: the gateway to every product area. Public and identical for
+// every visitor, so it is statically rendered and regenerated at most once a
+// minute (ISR); Community mutations also revalidate it immediately. Sign-in
+// state is shown by the client-side header; protected areas authenticate
+// on entry.
+export const revalidate = 60;
 
 const AREAS = [
   { href: "/qfinera/learn/beginner", icon: BookOpen, title: "Learn", body: "A beginner journey, one question at a time. Short chapters, plain language.", status: "Live" },
@@ -42,10 +44,11 @@ const JOURNEY = [
 ];
 
 export default async function QFineraHomePage() {
-  const [{ posts, total }, session] = await Promise.all([
-    listQFinanceCommunityPosts({ page: 1 }),
-    getQFinanceServerSession().catch(() => null),
-  ]);
+  // A database hiccup should not take the gateway down: show the empty feed.
+  const { posts, total } = await listQFinanceCommunityPosts({ page: 1 }).catch((err) => {
+    console.error("QFinera: could not load the Community feed:", err);
+    return { posts: [], total: 0 };
+  });
   const featured = posts.slice(0, 4);
 
   return (
@@ -63,25 +66,12 @@ export default async function QFineraHomePage() {
               invest alongside.
             </p>
             <div className="mt-8 flex flex-col items-stretch justify-center gap-3 sm:flex-row sm:items-center">
-              {session ? (
-                <>
-                  <Link href="/qfinera/pools" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[var(--qf-brass-dark)] px-6 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90">
-                    Go to my pools <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
-                  <Link href="/qfinera/community" className="inline-flex min-h-12 items-center justify-center rounded-md border border-[var(--qf-line)] px-6 text-[15px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)]">
-                    Open Community
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <Link href="/qfinera/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[var(--qf-brass-dark)] px-6 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90">
-                    Join QFinera <ArrowRight size={16} aria-hidden="true" />
-                  </Link>
-                  <Link href="/qfinera/learn/beginner" className="inline-flex min-h-12 items-center justify-center rounded-md border border-[var(--qf-line)] px-6 text-[15px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)]">
-                    Start learning
-                  </Link>
-                </>
-              )}
+              <Link href="/qfinera/register" className="inline-flex min-h-12 items-center justify-center gap-2 rounded-md bg-[var(--qf-brass-dark)] px-6 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90">
+                Join QFinera <ArrowRight size={16} aria-hidden="true" />
+              </Link>
+              <Link href="/qfinera/learn/beginner" className="inline-flex min-h-12 items-center justify-center rounded-md border border-[var(--qf-line)] px-6 text-[15px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)]">
+                Start learning
+              </Link>
             </div>
           </Reveal>
         </div>
@@ -144,11 +134,11 @@ export default async function QFineraHomePage() {
               expense, and a full audit trail. Invite-only, and QFinera never touches the money.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-              <Link href={session ? "/qfinera/pools/create" : "/qfinera/register"} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--qf-brass-dark)] px-5 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90">
+              <Link href="/qfinera/pools/create" className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-[var(--qf-brass-dark)] px-5 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90">
                 Create a pool <ArrowRight size={15} aria-hidden="true" />
               </Link>
               <Link href="/qfinera/pools" className="inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-5 text-[15px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)]">
-                {session ? "My pools" : "How pools work"}
+                Open Pools
               </Link>
             </div>
           </Reveal>

@@ -122,7 +122,8 @@ export function StatusBadge({ status, label }: { status: string | null | undefin
   if (!status) return <Missing />;
   const tone = STATUS_TONE[status] ?? "muted";
   return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold leading-5 ${TONE_CLASS[tone]}`}>
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold leading-5 ${TONE_CLASS[tone]}`}>
+      <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-current opacity-80" />
       {label ?? STATUS_LABEL[status] ?? humanize(status)}
     </span>
   );

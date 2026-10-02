@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownToLine,
   ArrowLeftRight,
@@ -22,6 +22,7 @@ import { Drawer } from "@/components/fund/overlays";
 import { NAV_ITEMS, POOLS_BASE, isNavActive, poolBase, visibleNav, type NavIcon } from "@/components/fund/nav";
 import { useCan, useFund } from "@/components/fund/session";
 import { humanize } from "@/components/fund/format";
+import { StatusBadge } from "@/components/fund/display";
 import { PRIVATE_POOL_NOTICE } from "@/lib/fund/product-gate";
 
 const ICONS: Record<NavIcon, typeof Users> = {
@@ -57,13 +58,14 @@ function NavList({ onNavigate }: { onNavigate?: () => void }) {
                 href={href}
                 onClick={onNavigate}
                 aria-current={active ? "page" : undefined}
-                className={`flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-[14px] font-medium transition-colors ${focusRing} ${
+                className={`relative flex min-h-10 items-center gap-3 rounded-md px-3 py-2 text-[14px] font-medium transition-colors ${focusRing} ${
                   active
-                    ? "bg-[var(--qf-cream-2)] text-[var(--qf-ink)]"
-                    : "text-[var(--qf-ink-soft)] hover:bg-[var(--qf-cream-1)] hover:text-[var(--qf-ink)]"
+                    ? "bg-[var(--qf-cream-0)] text-[var(--qf-ink)] shadow-[0_1px_2px_rgba(43,38,33,0.06)]"
+                    : "text-[var(--qf-ink-soft)] hover:bg-[var(--qf-cream-2)]/60 hover:text-[var(--qf-ink)]"
                 }`}
               >
-                <Icon size={16} aria-hidden="true" />
+                {active && <span aria-hidden="true" className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-[var(--qf-brass)]" />}
+                <Icon size={16} className={active ? "text-[var(--qf-brass-dark)]" : ""} aria-hidden="true" />
                 {item.label}
               </Link>
             </li>
@@ -101,16 +103,61 @@ function PoolSwitcher({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
+/** Phones and tablets: every section in one scrollable strip, active one marked. */
+function SectionStrip() {
+  const can = useCan();
+  const { poolId } = useFund();
+  const pathname = usePathname();
+  const listRef = useRef<HTMLUListElement>(null);
+  // Keep the active section in view; scrolls the strip only, never the page.
+  useEffect(() => {
+    const list = listRef.current;
+    const active = list?.querySelector<HTMLElement>('[aria-current="page"]');
+    if (list && active) list.scrollLeft = active.offsetLeft - (list.clientWidth - active.offsetWidth) / 2;
+  }, [pathname]);
+  return (
+    <nav aria-label="Pool sections" className="border-b border-[var(--qf-line)] lg:hidden">
+      <ul ref={listRef} className="relative flex gap-1 overflow-x-auto px-3 [scrollbar-width:none] sm:px-5 [&::-webkit-scrollbar]:hidden">
+        {visibleNav(can).map((item) => {
+          const Icon = ICONS[item.icon];
+          const href = `${poolBase(poolId)}/${item.segment}`;
+          const active = isNavActive(pathname, href);
+          return (
+            <li key={item.segment} className="shrink-0">
+              <Link
+                href={href}
+                aria-current={active ? "page" : undefined}
+                className={`flex min-h-11 items-center gap-1.5 border-b-2 px-2.5 text-[13.5px] font-medium transition-colors ${focusRing} ${
+                  active
+                    ? "border-[var(--qf-brass)] text-[var(--qf-ink)]"
+                    : "border-transparent text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)]"
+                }`}
+              >
+                <Icon size={14} aria-hidden="true" />
+                {item.label}
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
 export function FundSidebar() {
-  const { poolName } = useFund();
+  const { poolName, role, poolStatus } = useFund();
   return (
     <aside className="hidden border-r border-[var(--qf-line)] bg-[var(--qf-cream-1)] lg:block">
       <div className="sticky top-16 flex h-[calc(100dvh-4rem)] flex-col gap-6 overflow-y-auto p-4">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-brass-dark)]">Private pool</p>
-          <p className="mt-0.5 truncate font-display text-[16px] font-semibold text-[var(--qf-ink)]" title={poolName}>
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">Private pool</p>
+          <p className="mt-1 truncate font-display text-[18px] font-semibold leading-tight text-[var(--qf-ink)]" title={poolName}>
             {poolName}
           </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <StatusBadge status={role} label={humanize(role)} />
+            {poolStatus !== "active" && <StatusBadge status={poolStatus} />}
+          </div>
         </div>
         <NavList />
         <div className="mt-auto border-t border-[var(--qf-line)] pt-3">
@@ -174,20 +221,22 @@ export function FundShell({ children }: { children: React.ReactNode }) {
         <FundSidebar />
         <div className="min-w-0">
           <div className="flex min-h-12 items-center gap-3 border-b border-[var(--qf-line)] px-4 py-2 sm:px-6">
-            <button
-              type="button"
-              onClick={() => setMenuOpen(true)}
-              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-[var(--qf-line)] px-3 text-[13.5px] font-medium text-[var(--qf-ink)] lg:hidden ${focusRing}`}
-            >
-              <Menu size={16} aria-hidden="true" /> Sections
-            </button>
             <div className="min-w-0 flex-1">
               <Breadcrumbs />
             </div>
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              aria-label="All sections and pools"
+              className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-md border border-[var(--qf-line)] px-3 text-[13px] font-medium text-[var(--qf-ink)] lg:hidden ${focusRing}`}
+            >
+              <Menu size={15} aria-hidden="true" /> <span className="hidden sm:inline">Menu</span>
+            </button>
             <p className="hidden shrink-0 text-[12.5px] text-[var(--qf-ink-soft)] md:block">
               {displayName} <span aria-hidden="true">&middot;</span> {humanize(role)}
             </p>
           </div>
+          <SectionStrip />
           <Drawer open={menuOpen} onClose={() => setMenuOpen(false)} title={poolName} description="Pool sections" side="left">
             <div className="space-y-6 p-3">
               <NavList onNavigate={() => setMenuOpen(false)} />
