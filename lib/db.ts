@@ -33,6 +33,12 @@ export function isDbConfigured(): boolean {
   return Boolean(process.env.DATABASE_URL);
 }
 
+// Shared pool for read queries from the QFinera Fund layer (lib/fund/*).
+// Fund WRITES must go through withTransaction, never through this directly.
+export function getDbPool(): Pool | null {
+  return getPool();
+}
+
 // Runs `fn` inside a single PostgreSQL transaction: BEGIN -> fn -> COMMIT,
 // or ROLLBACK (and rethrow) if fn throws. Used by every NAV-affecting
 // QFinera Fund operation. Unlike the helpers above, this does NOT silently

@@ -33,7 +33,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ ok: false, error: "Invalid post id" }, { status: 400 });
   }
 
-  const session = getQFinanceSessionFromRequest(req);
+  const session = await getQFinanceSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Sign in to edit this post." }, { status: 401 });
   }
@@ -73,7 +73,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     return NextResponse.json({ ok: false, error: "Invalid post id" }, { status: 400 });
   }
 
-  const session = getQFinanceSessionFromRequest(req);
+  const session = await getQFinanceSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Sign in to delete this post." }, { status: 401 });
   }

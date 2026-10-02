@@ -1,0 +1,11 @@
+-- Thread-level, opt-out email notification preference. Minimal by design
+-- (Section "THREAD MUTE" of the notifications spec) — one row per
+-- (post, user) that has muted that specific discussion. Absence of a row
+-- means "notifications on" (the default), so most users never get a row
+-- at all.
+CREATE TABLE IF NOT EXISTS qfinance_community_thread_notification_preferences (
+  post_id INTEGER NOT NULL REFERENCES qfinance_community_posts(id),
+  user_id INTEGER NOT NULL REFERENCES qfinance_users(id),
+  muted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (post_id, user_id)
+);

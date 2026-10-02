@@ -5,7 +5,7 @@ import { getQFinanceSessionFromRequest } from "@/lib/qfinance-community-auth";
 const VALID_REASONS: ReportReason[] = ["spam", "scam", "harassment", "misleading_claim", "personal_info", "other"];
 
 export async function POST(req: NextRequest) {
-  const session = getQFinanceSessionFromRequest(req);
+  const session = await getQFinanceSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Sign in to report content." }, { status: 401 });
   }

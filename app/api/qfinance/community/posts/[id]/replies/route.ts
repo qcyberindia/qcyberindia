@@ -4,7 +4,7 @@ import { getQFinanceSessionFromRequest } from "@/lib/qfinance-community-auth";
 import { sendQFinanceReplyNotifications } from "@/lib/qfinance-community-notifications";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const session = getQFinanceSessionFromRequest(req);
+  const session = await getQFinanceSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Sign in to reply." }, { status: 401 });
   }

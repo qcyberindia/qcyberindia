@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Fraunces, Inter } from "next/font/google";
+import QFineraTabBar from "@/components/qfinance/QFineraTabBar";
 import { qfinanceConfig } from "@/lib/qfinance-config";
 
 // Independent QFinance typography system.
@@ -76,7 +77,7 @@ export default function QFinanceLayout({
     <div
       id="qf-root"
       suppressHydrationWarning
-      className={`${fraunces.variable} ${inter.variable} qf-root min-h-screen bg-[var(--qf-cream-0)] font-body text-[var(--qf-ink)] text-[15px] leading-relaxed antialiased transition-colors duration-300`}
+      className={`${fraunces.variable} ${inter.variable} qf-root min-h-screen pb-[calc(3.5rem+env(safe-area-inset-bottom))] md:pb-0 bg-[var(--qf-cream-0)] font-body text-[var(--qf-ink)] text-[15px] leading-relaxed antialiased transition-colors duration-300`}
     >
       <script
         suppressHydrationWarning
@@ -164,6 +165,7 @@ export default function QFinanceLayout({
       `}</style>
 
       {children}
+      <QFineraTabBar />
     </div>
   );
 }

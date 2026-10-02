@@ -10,7 +10,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = getQFinanceSessionFromRequest(req);
+  const session = await getQFinanceSessionFromRequest(req);
   if (!session) {
     return NextResponse.json({ ok: false, error: "Sign in to post a question." }, { status: 401 });
   }

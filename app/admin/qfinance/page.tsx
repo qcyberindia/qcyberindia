@@ -40,7 +40,10 @@ export default function AdminQFinancePage() {
           <h1 className="mt-1.5 font-display text-2xl font-bold tracking-tight text-[var(--color-ink)] sm:text-3xl">
             Beta Registrations
           </h1>
-          <div className="mt-2 flex gap-4">
+          <div className="mt-2 flex flex-wrap gap-4">
+            <Link href="/admin/qfinance/users" className="text-sm font-medium text-[var(--color-navy)] hover:underline">
+              Users →
+            </Link>
             <Link href="/admin/qfinance/community/posts" className="text-sm font-medium text-[var(--color-navy)] hover:underline">
               Community posts →
             </Link>

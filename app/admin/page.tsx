@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Building2, Landmark, AlertTriangle } from "lucide-react";
+import { Building2, Landmark, AlertTriangle, Users } from "lucide-react";
 import AdminStat from "@/components/admin/AdminStat";
 import AdminLoadingState from "@/components/admin/AdminLoadingState";
 
-type Overview = { qbids: number; qfinance: number; dbConfigured: boolean } | null;
+type Overview = { qbids: number; qfinance: number; qfineraUsers: number; dbConfigured: boolean } | null;
 
 export default function AdminOverviewPage() {
   const [data, setData] = useState<Overview>(null);
@@ -51,9 +51,10 @@ export default function AdminOverviewPage() {
               No DATABASE_URL configured — counts below are 0 until a database is connected.
             </p>
           )}
-          <div className="mt-6 grid grid-cols-2 gap-4 sm:max-w-md">
+          <div className="mt-6 grid grid-cols-2 gap-4 sm:max-w-2xl sm:grid-cols-3">
             <AdminStat label="Qbids registrations" value={data.qbids} icon={Building2} href="/admin/qbids" />
-            <AdminStat label="QFinera registrations" value={data.qfinance} icon={Landmark} href="/admin/qfinance" />
+            <AdminStat label="QFinera beta signups" value={data.qfinance} icon={Landmark} href="/admin/qfinance" />
+            <AdminStat label="QFinera users" value={data.qfineraUsers} icon={Users} href="/admin/qfinance/users" />
           </div>
         </>
       )}

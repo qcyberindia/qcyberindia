@@ -1,107 +1,77 @@
 "use client";
 
-import { useState } from "react";
-import { usePathname } from "next/navigation";
+// The QFinera product header, used by every /qfinera page: identity, the
+// primary sections (Learn, Research, Community, Pools) with active state,
+// theme, and account. On phones the sections live in the bottom tab bar
+// (QFineraTabBar), so the top bar stays uncluttered.
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { usePathname } from "next/navigation";
+import { UserRound } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
+import { PRIMARY_NAV, isActive } from "./qfinera-nav";
+import { useQFineraUser } from "./useQFineraUser";
 
-const links = [
-  { href: "/qfinera/community", label: "Community" },
-  { href: "/qfinera/learn/beginner", label: "Learn" },
-  { href: "/qfinera/about", label: "About" },
-];
+const focus = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--qf-brass)]";
 
-export default function QFinanceHeader() {
-  const [open, setOpen] = useState(false);
+export default function QFinanceHeader({ wide = false }: { wide?: boolean }) {
   const pathname = usePathname();
-
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
+  const { user, known } = useQFineraUser();
 
   return (
-    <header className="sticky top-0 z-20 border-b border-[var(--qf-line)] bg-[var(--qf-cream-0)]/95 backdrop-blur">
-      <nav className="mx-auto flex max-w-4xl items-center justify-between px-6 py-4 sm:py-[18px]">
-        <Link
-          href="/qfinera"
-          className="font-display text-xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-[22px]"
-          aria-label="QFinera home"
-          onClick={() => setOpen(false)}
-        >
+    <header className="sticky top-0 z-30 border-b border-[var(--qf-line)] bg-[var(--qf-cream-0)]/95 backdrop-blur">
+      <nav aria-label="QFinera" className={`mx-auto flex h-14 items-center justify-between gap-4 px-4 sm:h-16 sm:px-6 ${wide ? "max-w-none" : "max-w-6xl"}`}>
+        <Link href="/qfinera" aria-label="QFinera home" className={`rounded-sm font-display text-xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-[22px] ${focus}`}>
           Q<em className="not-italic text-[var(--qf-brass)]">Finera</em>
         </Link>
 
-        <div className="flex items-center gap-4 sm:gap-5">
-          {links.map((l) => {
-            const active = isActive(l.href);
+        <ul className="hidden items-center gap-1 md:flex">
+          {PRIMARY_NAV.map((item) => {
+            const active = isActive(pathname, item);
             return (
-              <Link
-                key={l.href}
-                href={l.href}
-                aria-current={active ? "page" : undefined}
-                className={`hidden text-sm font-medium transition-colors sm:inline ${
-                  active ? "text-[var(--qf-brass-dark)]" : "text-[var(--qf-ink-soft)] hover:text-[var(--qf-brass-dark)]"
-                }`}
-              >
-                {l.label}
-              </Link>
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  className={`relative rounded-md px-3 py-2 text-[14px] font-medium transition-colors ${focus} ${
+                    active ? "text-[var(--qf-ink)]" : "text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)]"
+                  }`}
+                >
+                  {item.label}
+                  {active && <span aria-hidden="true" className="absolute inset-x-3 -bottom-[13px] h-0.5 rounded-full bg-[var(--qf-brass)] sm:-bottom-[17px]" />}
+                </Link>
+              </li>
             );
           })}
+        </ul>
 
+        <div className="flex items-center gap-2 sm:gap-3">
           <ThemeToggle />
-
-          <Link
-            href="/qfinera/beta"
-            className="hidden rounded-sm bg-[var(--qf-brass)] px-4 py-2.5 font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 sm:inline-block"
-          >
-            Join QFinera
-          </Link>
-
-          <button
-            type="button"
-            aria-label={open ? "Close menu" : "Open menu"}
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-sm text-[var(--qf-ink)] hover:bg-[var(--qf-cream-1)] sm:hidden"
-          >
-            {open ? <X size={20} /> : <Menu size={20} />}
-          </button>
+          {!known ? (
+            <span className="h-9 w-20" aria-hidden="true" />
+          ) : user ? (
+            <Link
+              href="/qfinera/account"
+              aria-current={pathname?.startsWith("/qfinera/account") ? "page" : undefined}
+              className={`flex min-h-9 items-center gap-2 rounded-md border border-[var(--qf-line)] px-3 py-1.5 text-[13.5px] font-medium text-[var(--qf-ink)] hover:border-[var(--qf-brass)] ${focus}`}
+            >
+              <UserRound size={15} aria-hidden="true" />
+              <span className="max-w-[9rem] truncate">{user.displayName}</span>
+            </Link>
+          ) : (
+            <div className="flex items-center gap-2">
+              <Link href="/qfinera/login" className={`hidden rounded-md px-3 py-2 text-[14px] font-medium text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)] sm:inline-block ${focus}`}>
+                Sign in
+              </Link>
+              <Link
+                href="/qfinera/register"
+                className={`rounded-md bg-[var(--qf-brass-dark)] px-3.5 py-2 font-display text-[13.5px] font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 ${focus}`}
+              >
+                Join QFinera
+              </Link>
+            </div>
+          )}
         </div>
       </nav>
-
-      <div
-        className={`overflow-hidden border-t border-[var(--qf-line)] bg-[var(--qf-cream-0)] transition-[max-height] duration-300 ease-in-out sm:hidden ${
-          open ? "max-h-72" : "max-h-0 border-t-0"
-        }`}
-      >
-        <div className="flex flex-col gap-1 px-6 py-3">
-          {links.map((l) => {
-            const active = isActive(l.href);
-            return (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                aria-current={active ? "page" : undefined}
-                className={`rounded-sm px-2 py-2.5 text-sm font-medium ${
-                  active ? "text-[var(--qf-brass-dark)]" : "text-[var(--qf-ink-soft)]"
-                }`}
-              >
-                {l.label}
-              </Link>
-            );
-          })}
-          {/* Same CTA as the desktop pill — just moved in here below `sm`,
-              since logo + theme toggle + pill + hamburger together overflow
-              at 320–375px when the pill sits in the top row. */}
-          <Link
-            href="/qfinera/beta"
-            onClick={() => setOpen(false)}
-            className="mt-1.5 rounded-sm bg-[var(--qf-brass)] px-4 py-2.5 text-center font-display text-sm font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90"
-          >
-            Join QFinera
-          </Link>
-        </div>
-      </div>
     </header>
   );
 }
