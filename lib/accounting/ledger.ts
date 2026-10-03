@@ -19,7 +19,9 @@ export type LedgerEntryType =
   | "SELL"
   | "EXPENSE"
   | "ADJUSTMENT"
-  | "REVERSAL";
+  | "REVERSAL"
+  /** Cash posting of a mark-to-market product trade (migration 012); any sign. */
+  | "TRADE_MTM";
 
 /** Mirrors qfinera_fund_ledger_entries. `cashDelta`/`unitsDelta` are plain
  * decimal strings (how pg round-trips NUMERIC); route them through
@@ -93,6 +95,10 @@ export function validateNewLedgerEntry(entry: NewLedgerEntry): string[] {
       if (member !== null) errors.push("EXPENSE is a fund-level entry (no member)");
       if (!units.isZero()) errors.push("EXPENSE must not change units");
       if (cash.compare(zero) >= 0) errors.push("EXPENSE cashDelta must be negative");
+      break;
+    case "TRADE_MTM":
+      if (member !== null) errors.push("TRADE_MTM is a fund-level entry (no member)");
+      if (!units.isZero()) errors.push("TRADE_MTM must not change units");
       break;
     case "ADJUSTMENT":
     case "REVERSAL":

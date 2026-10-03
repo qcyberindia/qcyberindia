@@ -12,6 +12,11 @@
 //   * Holdings are valued ONLY at an EOD/MANUAL price recorded within that
 //     IST date. A missing price blocks the NAV; a price is never guessed or
 //     carried over from another day.
+//   * Open positions are valued per product (lib/accounting/positions.ts
+//     navValue): long delivery/options at market, short options as a
+//     liability, intraday/futures at their unrealized price difference.
+//   * An EQUITY_INTRADAY position still open at the end of the day blocks
+//     the NAV: the square-off must be recorded first.
 //   * Only a trading day, and only once its cutoff time has passed.
 //   * Striking a date earlier than the latest official NAV, or correcting an
 //     official NAV, is an ADMIN correction (reason + confirmation + audit).
@@ -23,6 +28,7 @@
 //     no cash for) does not block the NAV or the others: it is rolled back
 //     to a savepoint, stays AWAITING_NAV and is reported back.
 import { calculateNav } from "@/lib/accounting/nav";
+import { navValue, type Direction, type Product } from "@/lib/accounting/positions";
 import { InvariantError } from "@/lib/accounting/invariants";
 import { Money } from "@/lib/accounting/money";
 import { cutoffInstant, isTradingDay, type NavCutoffConfig } from "@/lib/accounting/nav-cutoff";
@@ -143,6 +149,8 @@ export type NavHoldingLine = {
   instrumentId: number;
   symbol: string;
   exchange: string;
+  product: Product;
+  direction: Direction;
   quantity: string;
   price: string | null;
   priceQuality: string | null;
@@ -164,7 +172,8 @@ export type NavComputation = {
 /** Computes (never stores) the NAV for `date` from the ledger and that day's official prices. */
 export async function computeNav(db: Db, fundId: number, date: string, initialNav: Money): Promise<NavComputation> {
   const [ledger, positions] = await Promise.all([ledgerStateAsOf(db, fundId, date), loadPositions(db, fundId, date)]);
-  const ids = [...positions.keys()];
+  const entries = [...positions.values()];
+  const ids = [...new Set(entries.map((e) => e.instrumentId))];
   const [prices, instruments] = await Promise.all([
     loadOfficialPrices(db, fundId, ids, date),
     ids.length
@@ -178,21 +187,25 @@ export async function computeNav(db: Db, fundId: number, date: string, initialNa
 
   const holdings: NavHoldingLine[] = [];
   const missing: NavComputation["missingPrices"] = [];
-  for (const [id, position] of positions) {
+  const openIntraday: string[] = [];
+  for (const { instrumentId: id, product, position } of entries) {
     const inst = byId.get(id);
     const symbol = inst?.symbol ?? `#${id}`;
     const exchange = inst?.exchange ?? "-";
     const price = prices.get(id);
-    if (!price) missing.push({ instrumentId: id, symbol, exchange });
+    if (!price && !missing.some((x) => x.instrumentId === id)) missing.push({ instrumentId: id, symbol, exchange });
+    if (product === "EQUITY_INTRADAY") openIntraday.push(`${symbol} ${position.direction} ${position.quantity.toDecimalString(4)}`);
     holdings.push({
       instrumentId: id,
       symbol,
       exchange,
+      product,
+      direction: position.direction ?? "LONG",
       quantity: position.quantity.toDecimalString(4),
       price: price ? price.price.toDecimalString(4) : null,
       priceQuality: price?.quality ?? null,
       priceAsOf: price?.asOf ?? null,
-      value: price ? position.quantity.multiply(price.price).round(2).toDecimalString(2) : null,
+      value: price ? navValue(position, product, price.price).toDecimalString(2) : null,
     });
   }
   holdings.sort((a, b) => a.symbol.localeCompare(b.symbol));
@@ -203,13 +216,18 @@ export async function computeNav(db: Db, fundId: number, date: string, initialNa
       `No end-of-day price is recorded for ${date} for: ${missing.map((x) => `${x.symbol} (${x.exchange})`).join(", ")}.`
     );
   }
+  if (openIntraday.length > 0) {
+    problems.push(
+      `Intraday positions are still open on ${date}: ${openIntraday.join(", ")}. Record the square-off before striking the NAV.`
+    );
+  }
   if (ledger.cash.isNegative()) problems.push(`Cash on ${date} would be ${ledger.cash.toDecimalString(2)}.`);
 
   let result: NavComputation["result"] = null;
   if (problems.length === 0) {
     const nav = calculateNav({
       cash: ledger.cash,
-      holdings: holdings.map((h) => ({ symbol: h.symbol, quantity: m(h.quantity), price: m(h.price) })),
+      holdings: holdings.map((h) => ({ symbol: h.symbol, quantity: m(h.quantity), price: m(h.price), value: m(h.value) })),
       adjustments: Money.zero(), // ADJUSTMENT ledger entries are already part of cash
       outstandingUnits: ledger.units,
       initialNav,
@@ -446,7 +464,15 @@ export async function strikeNav(ctx: ServiceCtx, input: StrikeInput, now: Date =
         fund_value: snapshot.fundValue,
         outstanding_units: snapshot.outstandingUnits,
         calculation_version: snapshot.calculationVersion,
-        prices: computation.holdings.map((h) => ({ symbol: h.symbol, quantity: h.quantity, price: h.price, as_of: h.priceAsOf })),
+        prices: computation.holdings.map((h) => ({
+          symbol: h.symbol,
+          product: h.product,
+          direction: h.direction,
+          quantity: h.quantity,
+          price: h.price,
+          value: h.value,
+          as_of: h.priceAsOf,
+        })),
       },
       reason: isCorrection ? reason : null,
       meta: ctx.meta,

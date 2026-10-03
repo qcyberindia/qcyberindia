@@ -1,6 +1,12 @@
 // Official NAV calculation for QFinera Fund. Pure.
 //
-//   Fund Value = Cash + Market Value of Holdings + approved adjustments
+//   Fund Value = Cash + Value of open positions + approved adjustments
+//
+// A line without `value` is a long holding valued at round2(quantity x
+// price). A line WITH `value` carries its signed contribution from the
+// position engine (lib/accounting/positions.ts navValue): a short option
+// is a negative liability, an intraday/futures position its unrealized
+// price difference.
 //   NAV        = round4(Fund Value / Outstanding Units)
 //
 // Each holding is valued at round2(quantity x price) and the values are
@@ -17,6 +23,8 @@ export type HoldingValuation = {
   symbol: string;
   quantity: Money;
   price: Money;
+  /** Signed contribution to Fund Value, 2dp; overrides quantity x price. */
+  value?: Money;
 };
 
 export type NavInput = {
@@ -47,7 +55,7 @@ export function calculateNav(input: NavInput): NavResult {
   for (const h of input.holdings) {
     if (h.quantity.isNegative()) throw new Error(`${h.symbol}: quantity cannot be negative`);
     if (h.price.compare(Money.zero()) <= 0) throw new Error(`${h.symbol}: price must be greater than zero`);
-    holdingsValue = holdingsValue.add(h.quantity.multiply(h.price).round(2));
+    holdingsValue = holdingsValue.add(h.value ? h.value.round(2) : h.quantity.multiply(h.price).round(2));
   }
 
   const cash = input.cash.round(2);

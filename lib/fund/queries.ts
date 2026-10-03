@@ -3,7 +3,18 @@
 // functions only load it and apply the caller's visibility (a MEMBER sees
 // their own records, privileged roles see everyone's). Money and units
 // leave this module as decimal strings.
-import { averageCost, marketValue, unrealizedPnl } from "@/lib/accounting/holdings";
+import {
+  averageEntryPrice,
+  costBasis,
+  exposure,
+  navValue,
+  notional as notionalOf,
+  replayBook,
+  unrealized,
+  type BookEntry,
+  type BookPosition,
+  type Product,
+} from "@/lib/accounting/positions";
 import { Money } from "@/lib/accounting/money";
 import { xirr, type DatedCashFlow } from "@/lib/accounting/xirr";
 import { listAudit, loadEntityAudit, type AuditRecord } from "@/lib/fund/audit";
@@ -19,8 +30,7 @@ import {
   type ContributionRecord,
   type ContributionStatus,
 } from "@/lib/fund/services/contributions";
-import { replayPositions } from "@/lib/accounting/portfolio";
-import { listInstruments, marketStatus, quotesFor } from "@/lib/fund/services/market";
+import { listInstruments, marketStatus, quotesFor, type InstrumentType } from "@/lib/fund/services/market";
 import { getMemberUnits, ledgerStateNow, loadAccountingTrades, loadSettings } from "@/lib/fund/state";
 
 const m = (s: string | null | undefined) => Money.fromDecimalString(s ?? "0");
@@ -70,15 +80,32 @@ export async function latestOfficialNavs(db: Db, fundId: number): Promise<Offici
 
 // ----------------------------------------------------------- holdings
 
+/**
+ * One position: (instrument, product). Equity delivery rows are the
+ * traditional holdings; intraday, futures and options rows are trading
+ * positions. Values are decimal strings.
+ */
 export type HoldingRow = {
   instrumentId: number;
   symbol: string;
   exchange: string;
   name: string | null;
+  instrumentType: InstrumentType;
+  underlying: string | null;
+  expiryDate: string | null;
+  strikePrice: string | null;
+  optionType: string | null;
+  product: Product;
+  /** LONG / SHORT; null for a closed position. */
+  direction: "LONG" | "SHORT" | null;
   quantity: string;
+  /** Average entry price (excl. charges), 4dp. */
+  averageEntryPrice: string | null;
+  /** Cost incl. capitalized opening charges / average cost per unit (legacy names). */
   averageCost: string | null;
   costBasis: string;
   realizedPnl: string;
+  chargesPaid: string;
   /** From the market-data provider; null when unavailable. Display only, never accounting. */
   price: string | null;
   /** LIVE / DELAYED / EOD / MANUAL, or UNAVAILABLE. */
@@ -87,89 +114,127 @@ export type HoldingRow = {
   /** True when the price predates the last completed trading session. */
   priceStale: boolean;
   priceUnavailableReason: string | null;
+  /** Absolute quantity x price (notional / premium value). */
+  notional: string | null;
+  /** Signed contribution to fund value (a short option is negative; MTM rows are their unrealized P&L). */
   marketValue: string | null;
   unrealizedPnl: string | null;
-  /** Share of priced market value, only when every holding is priced. */
+  /** Share of priced gross notional, only when every open position is priced. */
   weight: string | null;
 };
 
 export type HoldingsSummary = {
+  /** Open positions. */
   rows: HoldingRow[];
+  /** Positions that were traded and are now flat (realized P&L only). */
+  closed: HoldingRow[];
   costBasis: string;
-  /** Null when any holding has no price: a partial total is never shown as the whole. */
+  /** Signed value of open positions in fund value. Null when any open position has no price. */
   marketValue: string | null;
   unrealizedPnl: string | null;
   /** Realized P&L across the fund's whole trade history, including closed positions. */
   realizedPnl: string;
+  /** Charges on every executed trade. */
+  chargesPaid: string;
+  /** Notional exposure; null when any open position has no price. */
+  exposure: { long: string; short: string; gross: string; net: string } | null;
   unpriced: number;
   stale: number;
 };
 
 export async function getHoldings(db: Db, fundId: number): Promise<HoldingsSummary> {
-  const all = replayPositions(await loadAccountingTrades(db, fundId));
-  const realized = [...all.values()].reduce((sum, p) => sum.add(p.realizedPnl), Money.zero());
-  const open = [...all.entries()].filter(([, p]) => !p.quantity.isZero());
-  if (open.length === 0) {
-    return {
-      rows: [],
-      costBasis: "0.00",
-      marketValue: "0.00",
-      unrealizedPnl: "0.00",
-      realizedPnl: realized.toDecimalString(2),
-      unpriced: 0,
-      stale: 0,
-    };
-  }
-
-  const instruments = await listInstruments(db, { q: null, exchange: null, ids: open.map(([id]) => id), limit: 1000 });
+  const book = [...replayBook(await loadAccountingTrades(db, fundId)).values()];
+  const realized = book.reduce((sum, e) => sum.add(e.position.realizedPnl), Money.zero());
+  const charges = book.reduce((sum, e) => sum.add(e.position.chargesPaid), Money.zero());
+  const ids = [...new Set(book.map((e) => e.instrumentId))];
+  const instruments = ids.length ? await listInstruments(db, { q: null, exchange: null, ids, limit: 1000 }) : [];
   const byId = new Map(instruments.map((i) => [i.id, i]));
-  const quotes = await quotesFor(db, fundId, instruments);
+  const openEntries = book.filter((e) => !e.position.quantity.isZero());
+  const quotes = await quotesFor(
+    db,
+    fundId,
+    instruments.filter((i) => openEntries.some((e) => e.instrumentId === i.id))
+  );
 
   let totalCost = Money.zero();
   let totalValue = Money.zero();
+  let totalUnrealized = Money.zero();
   let unpriced = 0;
   let stale = 0;
-  const staged = open.map(([id, position]) => {
-    const quote = quotes.get(id);
-    const price = quote?.available ? m(quote.price) : null;
-    const value = price ? marketValue(position, price) : null;
-    totalCost = totalCost.add(position.costBasis);
-    if (value) totalValue = totalValue.add(value);
-    else unpriced += 1;
-    if (quote?.available && quote.stale) stale += 1;
-    return { id, position, quote, price, value };
-  });
+  const priced: Array<{ position: BookPosition; price: Money | null }> = [];
 
-  const rows: HoldingRow[] = staged
-    .map(({ id, position, quote, price, value }) => {
-      const instrument = byId.get(id);
-      return {
-        instrumentId: id,
-        symbol: instrument?.symbol ?? `#${id}`,
-        exchange: instrument?.exchange ?? "-",
-        name: instrument?.name ?? null,
-        quantity: position.quantity.toDecimalString(4),
-        averageCost: averageCost(position)?.toDecimalString(4) ?? null,
-        costBasis: position.costBasis.toDecimalString(2),
-        realizedPnl: position.realizedPnl.toDecimalString(2),
-        price: price ? price.toDecimalString(4) : null,
-        priceQuality: quote?.quality ?? "UNAVAILABLE",
-        priceAsOf: quote?.available ? quote.asOf : null,
-        priceStale: quote?.available ? quote.stale : false,
-        priceUnavailableReason: quote && !quote.available ? quote.reason : quote ? null : "No price source.",
-        marketValue: value ? value.toDecimalString(2) : null,
-        unrealizedPnl: price ? unrealizedPnl(position, price).toDecimalString(2) : null,
-        weight: unpriced === 0 && value ? (weightPercent(value, totalValue)?.toDecimalString(2) ?? null) : null,
-      };
-    })
-    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+  const toRow = (e: BookEntry): HoldingRow & { _notional: Money | null } => {
+    const { position } = e;
+    const open = !position.quantity.isZero();
+    const instrument = byId.get(e.instrumentId);
+    const quote = open ? quotes.get(e.instrumentId) : undefined;
+    const price = quote?.available ? m(quote.price) : null;
+    const cost = costBasis(position);
+    const value = open && price ? navValue(position, e.product, price) : null;
+    const pnl = open && price ? unrealized(position, price) : null;
+    const notional = open && price ? notionalOf(position, price) : null;
+    if (open) {
+      totalCost = totalCost.add(cost);
+      priced.push({ position, price });
+      if (value && pnl) {
+        totalValue = totalValue.add(value);
+        totalUnrealized = totalUnrealized.add(pnl);
+      } else unpriced += 1;
+      if (quote?.available && quote.stale) stale += 1;
+    }
+    const avgEntry = averageEntryPrice(position);
+    return {
+      instrumentId: e.instrumentId,
+      symbol: instrument?.symbol ?? `#${e.instrumentId}`,
+      exchange: instrument?.exchange ?? "-",
+      name: instrument?.name ?? null,
+      instrumentType: instrument?.instrumentType ?? "EQUITY",
+      underlying: instrument?.underlying ?? null,
+      expiryDate: instrument?.expiryDate ?? null,
+      strikePrice: instrument?.strikePrice ?? null,
+      optionType: instrument?.optionType ?? null,
+      product: e.product,
+      direction: open ? position.direction : null,
+      quantity: position.quantity.toDecimalString(4),
+      averageEntryPrice: avgEntry?.toDecimalString(4) ?? null,
+      averageCost: open ? cost.divide(position.quantity).round(4).toDecimalString(4) : null,
+      costBasis: cost.toDecimalString(2),
+      realizedPnl: position.realizedPnl.toDecimalString(2),
+      chargesPaid: position.chargesPaid.toDecimalString(2),
+      price: price ? price.toDecimalString(4) : null,
+      priceQuality: open ? (quote?.quality ?? "UNAVAILABLE") : "UNAVAILABLE",
+      priceAsOf: quote?.available ? quote.asOf : null,
+      priceStale: quote?.available ? quote.stale : false,
+      priceUnavailableReason: !open ? null : quote && !quote.available ? quote.reason : quote ? null : "No price source.",
+      notional: notional ? notional.toDecimalString(2) : null,
+      marketValue: value ? value.toDecimalString(2) : null,
+      unrealizedPnl: pnl ? pnl.toDecimalString(2) : null,
+      weight: null,
+      _notional: notional,
+    };
+  };
+
+  const staged = book.map(toRow);
+  const exp = unpriced === 0 ? exposure(priced) : null;
+  const strip = ({ _notional, ...row }: HoldingRow & { _notional: Money | null }): HoldingRow => ({
+    ...row,
+    weight: exp && _notional && !exp.gross.isZero() ? (weightPercent(_notional, exp.gross)?.toDecimalString(2) ?? null) : null,
+  });
+  const order = (a: HoldingRow, b: HoldingRow) => a.symbol.localeCompare(b.symbol) || a.product.localeCompare(b.product);
+  const rows = staged.filter((r) => r.direction !== null).map(strip).sort(order);
+  const closed = staged.filter((r) => r.direction === null).map(strip).sort(order);
 
   return {
     rows,
+    closed,
     costBasis: totalCost.toDecimalString(2),
     marketValue: unpriced === 0 ? totalValue.toDecimalString(2) : null,
-    unrealizedPnl: unpriced === 0 ? totalValue.subtract(totalCost).toDecimalString(2) : null,
+    unrealizedPnl: unpriced === 0 ? totalUnrealized.toDecimalString(2) : null,
     realizedPnl: realized.toDecimalString(2),
+    chargesPaid: charges.toDecimalString(2),
+    exposure: exp
+      ? { long: exp.long.toDecimalString(2), short: exp.short.toDecimalString(2), gross: exp.gross.toDecimalString(2), net: exp.net.toDecimalString(2) }
+      : null,
     unpriced,
     stale,
   };

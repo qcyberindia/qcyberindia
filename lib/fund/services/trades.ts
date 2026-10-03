@@ -15,15 +15,42 @@
 //
 // A trade dated on or before the latest official NAV is a backdated
 // correction (ADMIN, reason, confirmation): see decideBackdate.
+//
+// Every trade carries a product and a position action (migration 012); the
+// side is implied by the action. Position and cash effects come from the
+// position engine (lib/accounting/positions.ts):
+//   * EQUITY_DELIVERY / OPTIONS post a BUY/SELL ledger entry for the full
+//     traded value.
+//   * EQUITY_INTRADAY / FUTURES are mark-to-market: they post a TRADE_MTM
+//     entry (charges on open; price difference less charges on close).
+//     Because a close's cash depends on the open it closes, executions on a
+//     mark-to-market position must be recorded and reversed in order.
+// A SELL that opens a short needs no holding; a close can never exceed the
+// open position, and a position never flips side in one execution.
 import { Money } from "@/lib/accounting/money";
-import { replayPositions, type ReplayTrade } from "@/lib/accounting/portfolio";
+import {
+  PositionError,
+  applyExecution,
+  averageEntryPrice,
+  invalidCombination,
+  positionKey,
+  replayBook,
+  settlementOf,
+  sideFor,
+  emptyBookPosition,
+  type BookPosition,
+  type BookTrade,
+  type PositionAction,
+  type Product,
+} from "@/lib/accounting/positions";
+import { sortTrades } from "@/lib/accounting/portfolio";
 import { computeTrade, type TradeComputation, type TradeSide } from "@/lib/accounting/trades";
 import { loadEntityAudit, writeAudit, type AuditRecord } from "@/lib/fund/audit";
 import { inTransaction, lockFund, one, type Db } from "@/lib/fund/db";
-import { conflictError, notFoundError, validationError } from "@/lib/fund/errors";
+import { FundError, conflictError, notFoundError, validationError } from "@/lib/fund/errors";
 import { postLedgerEntry } from "@/lib/fund/ledger-store";
 import { assertPermission, hasPermission, type FundActor } from "@/lib/fund/rbac";
-import { assertCashNeverNegativeFrom, loadAccountingTrades } from "@/lib/fund/state";
+import { assertCashNeverNegativeFrom, loadAccountingTrades, type AccountingTrade } from "@/lib/fund/state";
 import {
   MIN_BACKDATE_REASON,
   accountingRule,
@@ -40,6 +67,16 @@ export const TRADE_STATUSES: readonly TradeStatus[] = ["DRAFT", "EXECUTED", "SET
 /** Statuses whose cash and holdings effect is live. FINALIZED is the legacy 006 value. */
 export const EFFECTIVE_TRADE_STATUSES: readonly TradeStatus[] = ["EXECUTED", "SETTLED", "FINALIZED"];
 
+export type InstrumentType = "EQUITY" | "FUTURE" | "OPTION";
+
+/** The instrument type each product trades. */
+export const PRODUCT_INSTRUMENT: Record<Product, InstrumentType> = {
+  EQUITY_DELIVERY: "EQUITY",
+  EQUITY_INTRADAY: "EQUITY",
+  FUTURES: "FUTURE",
+  OPTIONS: "OPTION",
+};
+
 export type TradeRecord = {
   id: number;
   fund_id: number;
@@ -47,6 +84,13 @@ export type TradeRecord = {
   symbol: string;
   exchange: string;
   instrument_name: string | null;
+  instrument_type: InstrumentType;
+  underlying_symbol: string | null;
+  expiry_date: string | null;
+  strike_price: string | null;
+  option_type: "CE" | "PE" | null;
+  product: Product;
+  position_action: PositionAction;
   trade_date: string;
   settlement_date: string | null;
   side: TradeSide;
@@ -73,6 +117,8 @@ export type TradeRecord = {
 
 const TRADE_SELECT = `
   SELECT t.id, t.fund_id, t.instrument_id, i.symbol, i.exchange, i.name AS instrument_name,
+         i.instrument_type, i.underlying_symbol, i.expiry_date::text AS expiry_date,
+         i.strike_price::text AS strike_price, i.option_type, t.product, t.position_action,
          t.trade_date::text AS trade_date, t.settlement_date::text AS settlement_date, t.side,
          t.quantity::text AS quantity, t.price::text AS price, t.brokerage::text AS brokerage, t.stt::text AS stt,
          t.gst::text AS gst, t.stamp_duty::text AS stamp_duty, t.other_charges::text AS other_charges,
@@ -87,6 +133,8 @@ function auditState(t: TradeRecord): Record<string, unknown> {
   return {
     status: t.status,
     instrument: `${t.symbol}:${t.exchange}`,
+    product: t.product,
+    position_action: t.position_action,
     side: t.side,
     trade_date: t.trade_date,
     quantity: t.quantity,
@@ -131,38 +179,92 @@ export function tradeComputation(t: Pick<TradeRecord, "side" | "quantity" | "pri
   );
 }
 
-function asReplay(t: TradeRecord): ReplayTrade {
+function asBookTrade(t: TradeRecord): AccountingTrade {
   const c = tradeComputation(t);
   return {
     id: t.id,
     instrumentId: t.instrument_id,
     tradeDate: t.trade_date,
     side: t.side,
+    product: t.product,
+    action: t.position_action,
     quantity: m(t.quantity),
     price: m(t.price),
     charges: c.totalCharges,
   };
 }
 
-/** Throws a 409 naming the instrument if the trade history would oversell it. */
-function assertNoOversell(trades: readonly ReplayTrade[], symbols: Map<number, string>): void {
-  const byInstrument = new Map<number, ReplayTrade[]>();
-  for (const t of trades) byInstrument.set(t.instrumentId, [...(byInstrument.get(t.instrumentId) ?? []), t]);
-  for (const [instrumentId, list] of byInstrument) {
-    try {
-      replayPositions(list);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "not enough held";
-      throw conflictError(`This would oversell ${symbols.get(instrumentId) ?? `instrument #${instrumentId}`}: ${msg}.`);
-    }
+/** Throws a 409 naming the instrument if the history is not a valid sequence of positions. */
+function assertValidBook(trades: readonly BookTrade[], symbols: Map<number, string>): void {
+  try {
+    replayBook(trades);
+  } catch (err) {
+    if (!(err instanceof PositionError)) throw err;
+    const symbol = symbols.get(err.instrumentId ?? -1) ?? `instrument #${err.instrumentId}`;
+    if (err.message.startsWith("cannot sell")) throw conflictError(`This would oversell ${symbol}: ${err.message}.`);
+    throw conflictError(`${symbol}: ${err.message}.`);
   }
+}
+
+/**
+ * Mark-to-market cash is fixed when a close is executed, from the open it
+ * closes. Inserting or removing an execution BEFORE a later one on the same
+ * position would silently change that later close, so it is refused.
+ */
+function assertNothingLaterOnMtmPosition(history: readonly BookTrade[], t: BookTrade, symbol: string, verb: string): void {
+  if (settlementOf(t.product) !== "MTM") return;
+  const key = positionKey(t.instrumentId, t.product);
+  const later = history.find(
+    (h) => h.id !== t.id && positionKey(h.instrumentId, h.product) === key && (h.tradeDate > t.tradeDate || (h.tradeDate === t.tradeDate && h.id > t.id))
+  );
+  if (later) {
+    throw conflictError(
+      `${symbol} has a later ${t.product === "FUTURES" ? "futures" : "intraday"} execution (trade #${later.id}). Mark-to-market executions must be ${verb} in order; reverse the later trades first.`
+    );
+  }
+}
+
+/** The position (instrument, product) just before `t` in (date, id) order. */
+function positionBeforeTrade(history: readonly BookTrade[], t: BookTrade): BookPosition | null {
+  const key = positionKey(t.instrumentId, t.product);
+  const before = sortTrades(history).filter(
+    (h) => h.id !== t.id && positionKey(h.instrumentId, h.product) === key && (h.tradeDate < t.tradeDate || (h.tradeDate === t.tradeDate && h.id < t.id))
+  );
+  return replayBook(before).get(key)?.position ?? null;
 }
 
 // ---------------------------------------------------------------- create
 
+type InstrumentFacts = { symbol: string; instrument_type: InstrumentType; expiry_date: string | null; lot_size: number | null };
+
+/** Equity products trade equity rows, futures trade FUTURE contracts, options OPTION contracts. */
+function assertInstrumentFitsProduct(
+  instrument: InstrumentFacts,
+  input: { product: Product; tradeDate: string; quantity: Money }
+): void {
+  const expected = PRODUCT_INSTRUMENT[input.product];
+  if (instrument.instrument_type !== expected) {
+    throw validationError(`${instrument.symbol} is ${instrument.instrument_type === "EQUITY" ? "an equity" : `a ${instrument.instrument_type.toLowerCase()} contract`}; ${input.product.replace("_", " ").toLowerCase()} trades need ${expected === "EQUITY" ? "an equity" : `a ${expected.toLowerCase()} contract`}.`, {
+      instrumentId: "Wrong instrument type for this product",
+    });
+  }
+  if (expected !== "EQUITY") {
+    if (instrument.expiry_date && input.tradeDate > instrument.expiry_date) {
+      throw validationError(`${instrument.symbol} expired on ${instrument.expiry_date}.`, { tradeDate: "After expiry" });
+    }
+    const [whole, frac] = input.quantity.toDecimalString(4).split(".");
+    if (instrument.lot_size && (frac !== "0000" || BigInt(whole) % BigInt(instrument.lot_size) !== 0n)) {
+      throw validationError(`Quantity must be a whole number of lots (lot size ${instrument.lot_size}).`, { quantity: "Not a whole number of lots" });
+    }
+  }
+}
+
 export type CreateTradeInput = {
   instrumentId: number;
-  side: TradeSide;
+  product: Product;
+  action: PositionAction;
+  /** Optional; when given it must agree with the action. */
+  side: TradeSide | null;
   tradeDate: string;
   settlementDate: string | null;
   quantity: Money;
@@ -182,8 +284,11 @@ export async function createTrade(ctx: ServiceCtx, input: CreateTradeInput, now:
   if (input.settlementDate && input.settlementDate < input.tradeDate) {
     throw validationError("Settlement cannot be before the trade date.", { settlementDate: "Before trade date" });
   }
+  const combo = invalidCombination(input.product, input.action, input.side);
+  if (combo) throw validationError(combo, { action: combo });
+  const side = sideFor(input.action);
   const computation = accountingRule(() =>
-    computeTrade({ side: input.side, quantity: input.quantity, price: input.price, charges: input.charges })
+    computeTrade({ side, quantity: input.quantity, price: input.price, charges: input.charges })
   );
   if (computation.net.compare(Money.zero()) <= 0) {
     throw validationError("Charges cannot be equal to or more than the sale value.", { otherCharges: "Too high" });
@@ -193,24 +298,27 @@ export async function createTrade(ctx: ServiceCtx, input: CreateTradeInput, now:
     return await inTransaction(async (db) => {
       await lockFund(db, ctx.fundId);
       await assertFundActive(db, ctx.fundId);
-      const instrument = await one<{ id: number }>(db, "SELECT id FROM qfinera_fund_instruments WHERE id = $1", [
-        input.instrumentId,
-      ]);
+      const instrument = await one<{ id: number; symbol: string; instrument_type: InstrumentType; expiry_date: string | null; lot_size: number | null }>(
+        db,
+        "SELECT id, symbol, instrument_type, expiry_date::text AS expiry_date, lot_size FROM qfinera_fund_instruments WHERE id = $1",
+        [input.instrumentId]
+      );
       if (!instrument) throw validationError("Choose a valid instrument.", { instrumentId: "Unknown instrument" });
+      assertInstrumentFitsProduct(instrument, input);
 
       const inserted = await one<{ id: number }>(
         db,
         `INSERT INTO qfinera_fund_trades
            (fund_id, instrument_id, trade_date, settlement_date, side, quantity, price, brokerage, stt, gst,
-            stamp_duty, other_charges, net_value, status, external_ref, notes, created_by)
-         VALUES ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'DRAFT', $14, $15, $16)
+            stamp_duty, other_charges, net_value, status, external_ref, notes, created_by, product, position_action)
+         VALUES ($1, $2, $3::date, $4::date, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'DRAFT', $14, $15, $16, $17, $18)
          RETURNING id`,
         [
           ctx.fundId,
           input.instrumentId,
           input.tradeDate,
           input.settlementDate,
-          input.side,
+          side,
           input.quantity.toDecimalString(4),
           input.price.toDecimalString(4),
           input.charges.brokerage.toDecimalString(2),
@@ -222,6 +330,8 @@ export async function createTrade(ctx: ServiceCtx, input: CreateTradeInput, now:
           input.externalRef,
           input.notes,
           ctx.actor.userId,
+          input.product,
+          input.action,
         ]
       );
       if (!inserted) throw new Error("trade insert returned no row");
@@ -250,20 +360,25 @@ async function executeInDb(db: Db, ctx: ServiceCtx, draft: TradeRecord, backdate
   const backdate = await decideBackdate(db, ctx, draft.trade_date, backdateRequest);
   if (backdate.isBackdated) assertPermission(ctx.actor, "trades:backdate");
 
-  const computation = tradeComputation(draft);
   const history = await loadAccountingTrades(db, ctx.fundId);
-  assertNoOversell([...history, asReplay(draft)], new Map([[draft.instrument_id, draft.symbol]]));
+  const book = asBookTrade(draft);
+  assertNothingLaterOnMtmPosition(history, book, draft.symbol, "recorded");
+  const symbols = new Map([[draft.instrument_id, draft.symbol]]);
+  assertValidBook([...history, book], symbols);
+  const before = positionBeforeTrade(history, book);
+  const effect = accountingRule(() => applyExecution(before ?? emptyBookPosition(), book));
+  const mtm = settlementOf(draft.product) === "MTM";
 
   await postLedgerEntry(db, {
     fundId: ctx.fundId,
     memberId: null,
-    entryType: draft.side,
+    entryType: mtm ? "TRADE_MTM" : draft.side,
     referenceTable: "qfinera_fund_trades",
     referenceId: draft.id,
     entryDate: draft.trade_date,
-    cashDelta: computation.cashDelta,
+    cashDelta: effect.cashDelta,
     unitsDelta: Money.zero(),
-    description: `${draft.side === "BUY" ? "Buy" : "Sell"} ${draft.quantity} ${draft.symbol} @ ${draft.price}`,
+    description: `${draft.side === "BUY" ? "Buy" : "Sell"} ${draft.quantity} ${draft.symbol} @ ${draft.price} (${draft.product} ${draft.position_action})`,
     isBackdated: backdate.isBackdated,
     backdatedReason: backdate.reason,
     createdBy: ctx.actor.userId,
@@ -386,7 +501,7 @@ export async function reverseTrade(
     const posting = await one<{ cash_delta: string }>(
       db,
       `SELECT cash_delta::text AS cash_delta FROM qfinera_fund_ledger_entries
-        WHERE reference_table = 'qfinera_fund_trades' AND reference_id = $1 AND entry_type IN ('BUY', 'SELL')`,
+        WHERE reference_table = 'qfinera_fund_trades' AND reference_id = $1 AND entry_type IN ('BUY', 'SELL', 'TRADE_MTM')`,
       [id]
     );
     if (!posting) throw conflictError("This trade has no ledger posting to reverse.");
@@ -394,8 +509,12 @@ export async function reverseTrade(
     const effective = todayIst(now);
     const backdate = await decideBackdate(db, ctx, effective, { reason: input.reason, confirmed: input.confirmed });
 
-    const remaining = (await loadAccountingTrades(db, ctx.fundId)).filter((t) => t.id !== id);
-    assertNoOversell(remaining, new Map([[before.instrument_id, before.symbol]]));
+    const history = await loadAccountingTrades(db, ctx.fundId);
+    assertNothingLaterOnMtmPosition(history, asBookTrade(before), before.symbol, "reversed");
+    assertValidBook(
+      history.filter((t) => t.id !== id),
+      new Map([[before.instrument_id, before.symbol]])
+    );
 
     await postLedgerEntry(db, {
       fundId: ctx.fundId,
@@ -435,12 +554,93 @@ export async function reverseTrade(
   });
 }
 
+// --------------------------------------------------------------- preview
+
+export type PositionSnapshot = { direction: "LONG" | "SHORT" | null; quantity: string; averageEntryPrice: string | null; realizedPnl: string };
+
+export type TradePreview = {
+  side: TradeSide;
+  gross: string;
+  totalCharges: string;
+  /** Signed cash movement on the trade date if executed. */
+  cashImpact: string;
+  before: PositionSnapshot;
+  after: PositionSnapshot | null;
+  /** Realized P&L this execution would book (closing trades), else null. */
+  realizedPnl: string | null;
+  /** Why this execution would be refused, if it would. */
+  problem: string | null;
+};
+
+function snapshot(p: BookPosition): PositionSnapshot {
+  return {
+    direction: p.quantity.isZero() ? null : p.direction,
+    quantity: p.quantity.toDecimalString(4),
+    averageEntryPrice: averageEntryPrice(p)?.toDecimalString(4) ?? null,
+    realizedPnl: p.realizedPnl.toDecimalString(2),
+  };
+}
+
+/** What executing this ticket now would do. Writes nothing; never a substitute for execution-time checks. */
+export async function previewTrade(
+  db: Db,
+  ctx: ServiceCtx,
+  input: Pick<CreateTradeInput, "instrumentId" | "product" | "action" | "tradeDate" | "quantity" | "price" | "charges">
+): Promise<TradePreview> {
+  assertPermission(ctx.actor, "trades:create");
+  const combo = invalidCombination(input.product, input.action);
+  if (combo) throw validationError(combo, { action: combo });
+  const side = sideFor(input.action);
+  const c = accountingRule(() => computeTrade({ side, quantity: input.quantity, price: input.price, charges: input.charges }));
+  const instrument = await one<InstrumentFacts & { id: number }>(
+    db,
+    "SELECT id, symbol, instrument_type, expiry_date::text AS expiry_date, lot_size FROM qfinera_fund_instruments WHERE id = $1",
+    [input.instrumentId]
+  );
+  if (!instrument) throw validationError("Choose a valid instrument.", { instrumentId: "Unknown instrument" });
+  assertInstrumentFitsProduct(instrument, input);
+
+  const history = await loadAccountingTrades(db, ctx.fundId);
+  const draft: BookTrade = {
+    id: Number.MAX_SAFE_INTEGER,
+    instrumentId: input.instrumentId,
+    tradeDate: input.tradeDate,
+    product: input.product,
+    action: input.action,
+    quantity: input.quantity,
+    price: input.price,
+    charges: c.totalCharges,
+  };
+  const before = positionBeforeTrade(history, draft) ?? emptyBookPosition();
+  const base = { side, gross: c.gross.toDecimalString(2), totalCharges: c.totalCharges.toDecimalString(2), before: snapshot(before) };
+  try {
+    assertNothingLaterOnMtmPosition(history, draft, instrument.symbol, "recorded");
+    assertValidBook([...history, draft], new Map([[instrument.id, instrument.symbol]]));
+    const effect = applyExecution(before, draft);
+    return {
+      ...base,
+      cashImpact: effect.cashDelta.toDecimalString(2),
+      after: snapshot(effect.position),
+      realizedPnl: input.action.startsWith("CLOSE") ? effect.realized.toDecimalString(2) : null,
+      problem: null,
+    };
+  } catch (err) {
+    if (err instanceof FundError || err instanceof PositionError) {
+      return { ...base, cashImpact: "0.00", after: null, realizedPnl: null, problem: err.message };
+    }
+    throw err;
+  }
+}
+
 // ------------------------------------------------------------------ reads
 
 export type TradeFilter = {
   status: TradeStatus | null;
   side: TradeSide | null;
   instrumentId: number | null;
+  product: Product | null;
+  direction: "LONG" | "SHORT" | null;
+  phase: "OPEN" | "CLOSE" | null;
   from: string | null;
   to: string | null;
   pageSize: number;
@@ -456,12 +656,21 @@ export async function listTrades(db: Db, actor: FundActor, fundId: number, f: Tr
     AND ($4::int IS NULL OR t.instrument_id = $4)
     AND ($5::date IS NULL OR t.trade_date >= $5::date)
     AND ($6::date IS NULL OR t.trade_date <= $6::date)
-    AND ($7::boolean OR t.status NOT IN ('DRAFT', 'CANCELLED'))`;
-  const args = [fundId, f.status, f.side, f.instrumentId, f.from, f.to, seesDrafts];
-  const count = await one<{ n: number }>(db, `SELECT COUNT(*)::int AS n FROM qfinera_fund_trades t WHERE ${where}`, args);
+    AND ($7::boolean OR t.status NOT IN ('DRAFT', 'CANCELLED'))
+    AND ($10::text IS NULL OR t.product = $10)
+    AND ($11::text IS NULL OR t.position_action IN ('OPEN_' || $11, 'CLOSE_' || $11))
+    AND ($12::text IS NULL OR t.position_action IN ($12 || '_LONG', $12 || '_SHORT'))`;
+  const filters = [f.product, f.direction, f.phase];
+  const args = [fundId, f.status, f.side, f.instrumentId, f.from, f.to, seesDrafts, f.pageSize, f.offset, ...filters];
+  // COUNT ignores $8/$9 (paging) but keeps positions aligned.
+  const count = await one<{ n: number }>(
+    db,
+    `SELECT COUNT(*)::int AS n FROM qfinera_fund_trades t WHERE ${where} AND $8::int IS NOT NULL AND $9::int IS NOT NULL`,
+    args
+  );
   const { rows } = await db.query<TradeRecord>(
     `${TRADE_SELECT} WHERE ${where} ORDER BY t.trade_date DESC, t.id DESC LIMIT $8 OFFSET $9`,
-    [...args, f.pageSize, f.offset]
+    args
   );
   return { rows, total: count?.n ?? 0 };
 }

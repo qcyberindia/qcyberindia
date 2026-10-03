@@ -8,7 +8,7 @@ import { TAX_DISCLAIMER, estimateTax, LONG_TERM_DAYS } from "@/lib/accounting/ta
 import { can, type FundContext } from "@/lib/fund/auth";
 import { one, type Db } from "@/lib/fund/db";
 import { notFoundError } from "@/lib/fund/errors";
-import { latestOfficialNavs, memberPosition, type MemberPosition } from "@/lib/fund/queries";
+import { getHoldings, latestOfficialNavs, memberPosition, type MemberPosition } from "@/lib/fund/queries";
 import { getOfficialSnapshot, listNavHistory, previewNav, type NavPreview, type NavSnapshotRow } from "@/lib/fund/services/nav";
 import { accountingRule } from "@/lib/fund/services/types";
 import { ledgerStateNow, loadAccountingTrades, loadSettings } from "@/lib/fund/state";
@@ -32,7 +32,7 @@ export type DailyReport = {
   official: NavSnapshotRow | null;
   /** ADMIN only: what the NAV would be if struck now. */
   preview: NavPreview | null;
-  trades: Array<{ id: number; symbol: string; exchange: string; side: string; quantity: string; price: string; netValue: string; status: string }>;
+  trades: Array<{ id: number; symbol: string; exchange: string; product: string; action: string; side: string; quantity: string; price: string; netValue: string; status: string }>;
   contributions: { count: number; total: string; units: string; rows: FlowRow[] | null };
   withdrawals: { count: number; total: string; units: string; rows: FlowRow[] | null };
   expenses: { count: number; total: string };
@@ -45,9 +45,9 @@ export async function dailyReport(db: Db, ctx: FundContext, date: string): Promi
   const preview = can(ctx, "nav:finalize") ? await previewNav(db, fundId, date) : null;
 
   const { rows: trades } = await db.query<{
-    id: number; symbol: string; exchange: string; side: string; quantity: string; price: string; net_value: string; status: string;
+    id: number; symbol: string; exchange: string; product: string; action: string; side: string; quantity: string; price: string; net_value: string; status: string;
   }>(
-    `SELECT t.id, i.symbol, i.exchange, t.side, t.quantity::text AS quantity, t.price::text AS price,
+    `SELECT t.id, i.symbol, i.exchange, t.product, t.position_action AS action, t.side, t.quantity::text AS quantity, t.price::text AS price,
             t.net_value::text AS net_value, t.status
        FROM qfinera_fund_trades t JOIN qfinera_fund_instruments i ON i.id = t.instrument_id
       WHERE t.fund_id = $1 AND t.trade_date = $2::date AND t.status IN ('EXECUTED', 'SETTLED', 'FINALIZED', 'REVERSED')
@@ -91,7 +91,7 @@ export async function dailyReport(db: Db, ctx: FundContext, date: string): Promi
     official,
     preview,
     trades: trades.map((t) => ({
-      id: t.id, symbol: t.symbol, exchange: t.exchange, side: t.side, quantity: t.quantity, price: t.price, netValue: t.net_value, status: t.status,
+      id: t.id, symbol: t.symbol, exchange: t.exchange, product: t.product, action: t.action, side: t.side, quantity: t.quantity, price: t.price, netValue: t.net_value, status: t.status,
     })),
     contributions: await flows("qfinera_fund_contributions"),
     withdrawals: await flows("qfinera_fund_withdrawals"),
@@ -152,12 +152,17 @@ export async function memberStatement(
 }
 
 export async function taxReport(db: Db, ctx: FundContext, from: string | null, to: string | null) {
-  const [trades, settings] = await Promise.all([loadAccountingTrades(db, ctx.fund.id), loadSettings(db, ctx.fund.id)]);
+  const [allTrades, settings] = await Promise.all([loadAccountingTrades(db, ctx.fund.id), loadSettings(db, ctx.fund.id)]);
+  // Capital-gains lots only exist for delivery equity. Intraday equity is
+  // speculative business income and F&O non-speculative business income in
+  // India: they are reported as realized trading P&L (positions report),
+  // never folded into capital gains.
+  const trades = allTrades.filter((t) => t.product === "EQUITY_DELIVERY");
   const window = from && to ? { from, to } : undefined;
   const est = accountingRule(() => estimateTax(trades, settings.taxAssumptions, window));
   return {
     disclaimer: TAX_DISCLAIMER,
-    method: `FIFO lots per instrument; holdings over ${LONG_TERM_DAYS} days are long-term. Buy charges add to cost, sell charges reduce proceeds. No set-off, carry-forward, exemption, surcharge or cess. Informational only; it never affects NAV or units.`,
+    method: `Equity delivery trades only (intraday and F&O P&L is business income, shown in the positions report). FIFO lots per instrument; holdings over ${LONG_TERM_DAYS} days are long-term. Buy charges add to cost, sell charges reduce proceeds. No set-off, carry-forward, exemption, surcharge or cess. Informational only; it never affects NAV or units.`,
     assumptions: settings.taxAssumptions,
     from,
     to,
@@ -166,5 +171,45 @@ export async function taxReport(db: Db, ctx: FundContext, from: string | null, t
     stcgTax: est.stcgTax.toDecimalString(2),
     ltcgTax: est.ltcgTax.toDecimalString(2),
     totalEstimatedTax: est.totalEstimatedTax.toDecimalString(2),
+  };
+}
+
+/**
+ * Trading P&L and exposure (all products). New in migration 012; does not
+ * change any existing report. Definitions (ACCOUNTING_RULES.md section 10):
+ *   realized    P&L booked by closing executions, net of all charges
+ *   unrealized  open positions at the latest available price
+ *   long/short  notional (quantity x price) of open long / short positions
+ *   gross / net long + short / long - short
+ * Option exposure is premium notional, not delta-adjusted.
+ */
+export async function positionsReport(db: Db, ctx: FundContext) {
+  const h = await getHoldings(db, ctx.fund.id);
+  const byProduct = new Map<string, { realized: Money; unrealized: Money | null; charges: Money; open: number }>();
+  for (const r of [...h.rows, ...h.closed]) {
+    const cur = byProduct.get(r.product) ?? { realized: Money.zero(), unrealized: Money.zero(), charges: Money.zero(), open: 0 };
+    cur.realized = cur.realized.add(m(r.realizedPnl));
+    cur.charges = cur.charges.add(m(r.chargesPaid));
+    if (r.direction) {
+      cur.open += 1;
+      cur.unrealized = cur.unrealized && r.unrealizedPnl !== null ? cur.unrealized.add(m(r.unrealizedPnl)) : null;
+    }
+    byProduct.set(r.product, cur);
+  }
+  return {
+    realizedPnl: h.realizedPnl,
+    unrealizedPnl: h.unrealizedPnl,
+    tradingCharges: h.chargesPaid,
+    exposure: h.exposure,
+    unpriced: h.unpriced,
+    byProduct: [...byProduct].map(([product, v]) => ({
+      product,
+      openPositions: v.open,
+      realizedPnl: v.realized.toDecimalString(2),
+      unrealizedPnl: v.unrealized ? v.unrealized.toDecimalString(2) : null,
+      charges: v.charges.toDecimalString(2),
+    })),
+    open: h.rows,
+    closed: h.closed,
   };
 }

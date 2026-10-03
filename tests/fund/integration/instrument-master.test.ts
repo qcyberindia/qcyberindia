@@ -148,8 +148,10 @@ suite("NSE instrument master (real database)", () => {
       const r = await contributionRoute.POST(request(alice, `/api/qfinera/pools/${poolA}/contributions/${cid}`, { body: { action } }), params({ poolId: poolA, id: String(cid) }));
       expect(r.status).toBe(200);
     }
+    // Test clock control: the NAV date is otherwise derived from today's date.
+    await db.query("UPDATE qfinera_fund_contributions SET effective_date = '2026-09-01' WHERE id = $1", [cid]);
     const nav = await navRoute.POST(request(alice, `/api/qfinera/pools/${poolA}/nav`, { body: { date: "2026-09-01" } }), P(poolA));
-    expect(nav.status).toBe(200);
+    expect(nav.status).toBe(201);
 
     const trade = await json(
       await tradesRoute.POST(

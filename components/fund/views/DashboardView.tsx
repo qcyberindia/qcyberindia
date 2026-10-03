@@ -13,7 +13,7 @@ import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolResource } from "@/components/fund/useResource";
 import { AuditTrail } from "@/components/fund/workflow";
-import { SideLabel } from "@/components/fund/views/shared";
+import { SideLabel, PRODUCT_LABEL, instrumentLabel } from "@/components/fund/views/shared";
 
 function ViewAll({ href, label }: { href: string; label: string }) {
   return (
@@ -159,16 +159,16 @@ export function DashboardView() {
             )}
           </SectionCard>
 
-          <SectionCard title="Holdings" actions={<ViewAll href={`${base}/holdings`} label="All holdings" />} flush>
+          <SectionCard title="Open positions" actions={<ViewAll href={`${base}/holdings`} label="All positions" />} flush>
             {d.holdings.rows.length === 0 ? (
-              <EmptyState icon={Briefcase} title="No holdings yet" description="Holdings appear once a trade is executed." />
+              <EmptyState icon={Briefcase} title="No open positions" description="Positions appear once a trade is executed." />
             ) : (
               <DataTable
-                caption="Holdings"
+                caption="Open positions"
                 rows={d.holdings.rows.slice(0, 6)}
-                rowKey={(r) => r.instrumentId}
+                rowKey={(r) => `${r.instrumentId}:${r.product}`}
                 columns={[
-                  { key: "s", header: "Instrument", primary: true, cell: (r) => `${r.symbol} · ${r.exchange}` },
+                  { key: "s", header: "Instrument", primary: true, cell: (r) => `${instrumentLabel(r)} · ${PRODUCT_LABEL[r.product]}${r.direction === "SHORT" ? " · Short" : ""}` },
                   { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },
                   {
                     key: "p",

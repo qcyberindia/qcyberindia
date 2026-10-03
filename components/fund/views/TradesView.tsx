@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
-import { errorMessage, type InstrumentDto, type Paged, type Trade } from "@/components/fund/api";
+import { apiFetch, errorMessage, poolApi, type InstrumentDto, type Paged, type Trade, type TradePreviewDto } from "@/components/fund/api";
 import { isPositiveDecimal, resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
-import { DecimalField, SelectField, TextAreaField, TextField, inputClass } from "@/components/fund/forms";
+import { DecimalField, SegmentedField, TextAreaField, TextField, inputClass } from "@/components/fund/forms";
 import { recordHref } from "@/components/fund/nav";
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog } from "@/components/fund/overlays";
@@ -13,7 +13,15 @@ import { EmptyState, PageHeader, SectionCard, btnPrimary } from "@/components/fu
 import { useCan, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField, Pagination } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
-import { InstrumentPicker, SideLabel, todayIstInput } from "@/components/fund/views/shared";
+import {
+  ACTION_LABEL,
+  DirectionLabel,
+  InstrumentPicker,
+  PRODUCT_LABEL,
+  SideLabel,
+  instrumentLabel,
+  todayIstInput,
+} from "@/components/fund/views/shared";
 
 const CHARGES = [
   ["brokerage", "Brokerage"],
@@ -23,12 +31,85 @@ const CHARGES = [
   ["otherCharges", "Other charges"],
 ] as const;
 
+type Segment = "EQUITY" | "FUTURE" | "OPTION";
+type Product = "EQUITY_DELIVERY" | "EQUITY_INTRADAY" | "FUTURES" | "OPTIONS";
+type Action = "OPEN_LONG" | "OPEN_SHORT" | "CLOSE_LONG" | "CLOSE_SHORT";
+
+const ACTIONS: ReadonlyArray<{ value: Action; label: string; side: "BUY" | "SELL" }> = [
+  { value: "OPEN_LONG", label: "Open long", side: "BUY" },
+  { value: "OPEN_SHORT", label: "Open short", side: "SELL" },
+  { value: "CLOSE_LONG", label: "Close long", side: "SELL" },
+  { value: "CLOSE_SHORT", label: "Close short", side: "BUY" },
+];
+
+function productFor(segment: Segment, equityProduct: Product): Product {
+  return segment === "FUTURE" ? "FUTURES" : segment === "OPTION" ? "OPTIONS" : equityProduct;
+}
+
+/** Server-computed effect of the ticket (decimal strings; no browser arithmetic on money). */
+function TicketPreview({ preview, closing }: { preview: TradePreviewDto; closing: boolean }) {
+  const b = preview.before;
+  return (
+    <div className="space-y-3 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)]/50 p-3 text-[13.5px]" aria-live="polite">
+      {preview.problem && (
+        <p role="alert" className="font-medium text-[var(--qf-down)]">
+          This would be refused: {preview.problem}
+        </p>
+      )}
+      <dl className="grid grid-cols-3 gap-3">
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Gross value</dt>
+          <dd><MoneyDisplay value={preview.gross} /></dd>
+        </div>
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Charges</dt>
+          <dd><MoneyDisplay value={preview.totalCharges} /></dd>
+        </div>
+        <div>
+          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Net cash impact</dt>
+          <dd className="font-semibold"><MoneyDisplay value={preview.problem ? null : preview.cashImpact} signed /></dd>
+        </div>
+      </dl>
+      {(closing || b.direction) && (
+        <dl className="grid grid-cols-3 gap-3 border-t border-[var(--qf-line)] pt-3">
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Existing position</dt>
+            <dd><DirectionLabel direction={b.direction} /></dd>
+          </div>
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Current quantity</dt>
+            <dd><QuantityDisplay value={b.quantity} /></dd>
+          </div>
+          <div>
+            <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Average entry</dt>
+            <dd><MoneyDisplay value={b.averageEntryPrice} dp={4} /></dd>
+          </div>
+        </dl>
+      )}
+      {preview.after && (
+        <p className="text-[13px] text-[var(--qf-ink-soft)]">
+          After execution: <DirectionLabel direction={preview.after.direction} />
+          {preview.after.direction ? <> <QuantityDisplay value={preview.after.quantity} /> @ <MoneyDisplay value={preview.after.averageEntryPrice} dp={4} /></> : null}
+          {preview.realizedPnl !== null && (
+            <>
+              {" · "}Estimated realized P&amp;L <strong><MoneyDisplay value={preview.realizedPnl} signed /></strong>
+            </>
+          )}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const can = useCan();
+  const { poolId } = useFund();
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const [segment, setSegment] = useState<Segment>("EQUITY");
+  const [equityProduct, setEquityProduct] = useState<Product>("EQUITY_DELIVERY");
+  const [action, setAction] = useState<Action>("OPEN_LONG");
   const [instrument, setInstrument] = useState<InstrumentDto | null>(null);
-  const [side, setSide] = useState("BUY");
   const [tradeDate, setTradeDate] = useState(todayIstInput());
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
@@ -39,28 +120,66 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   const [backdateReason, setBackdateReason] = useState("");
   const [confirmBackdate, setConfirmBackdate] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<TradePreviewDto | null>(null);
+
+  const product = productFor(segment, equityProduct);
+  const longOnly = product === "EQUITY_DELIVERY";
+  const side = ACTIONS.find((a) => a.value === action)!.side;
+  const chargeBody = Object.fromEntries(CHARGES.map(([k]) => [k, charges[k] || "0"]));
+  const ticketReady = instrument !== null && isPositiveDecimal(quantity, 4) && isPositiveDecimal(price, 4) && CHARGES.every(([k]) => !charges[k] || isPositiveDecimal(charges[k], 2) || /^0+(\.0+)?$/.test(charges[k]));
+  const previewKey = ticketReady ? JSON.stringify([instrument!.id, product, action, tradeDate, quantity, price, chargeBody]) : "";
+
+  useEffect(() => {
+    if (!previewKey) return;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => {
+      const [instrumentId, p, a, d, q, pr, ch] = JSON.parse(previewKey);
+      apiFetch<{ preview: TradePreviewDto }>(poolApi(poolId, "trades/preview"), {
+        body: { instrumentId, product: p, action: a, tradeDate: d, quantity: q, price: pr, ...ch },
+        signal: ctrl.signal,
+      })
+        .then((r) => setPreview(r.preview))
+        .catch(() => setPreview(null));
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      ctrl.abort();
+    };
+  }, [previewKey, poolId]);
+
+  const chooseSegment = (s: Segment) => {
+    setSegment(s);
+    setInstrument(null);
+    setPreview(null);
+  };
+  const chooseEquityProduct = (p: Product) => {
+    setEquityProduct(p);
+    if (p === "EQUITY_DELIVERY" && (action === "OPEN_SHORT" || action === "CLOSE_SHORT")) setAction("OPEN_LONG");
+  };
 
   return (
     <FormDialog
       open={open}
       onClose={onClose}
-      title="Record a trade"
-      description="Enter the trade exactly as on the broker contract note. Executing moves cash and holdings on the trade date; the official NAV is struck at end of day."
+      title="Trade ticket"
+      description="Record an execution exactly as on the broker contract note. QFinera does not place orders. Executing moves the position and cash on the trade date; the official NAV is struck at end of day."
       submitLabel={execute ? "Record and execute" : "Save as draft"}
       pending={pending}
       error={error}
       onSubmit={async () => {
         setError(null);
-        if (!instrument) return setError("Choose an instrument.");
+        if (!instrument) return setError(segment === "EQUITY" ? "Choose an instrument." : "Choose a contract.");
         if (!isPositiveDecimal(quantity, 4) || !isPositiveDecimal(price, 4)) return setError("Quantity and price must be greater than zero (up to 4 decimals).");
         try {
           await run("trades", {
             instrumentId: instrument.id,
+            product,
+            action,
             side,
             tradeDate,
             quantity,
             price,
-            ...Object.fromEntries(CHARGES.map(([k]) => [k, charges[k] || "0"])),
+            ...chargeBody,
             externalRef: externalRef.trim() || undefined,
             notes: notes.trim() || undefined,
             execute,
@@ -74,24 +193,58 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
         }
       }}
     >
-      <InstrumentPicker value={instrument} onChange={setInstrument} />
-      <div className="grid gap-4 sm:grid-cols-2">
-        <SelectField label="Side" value={side} onChange={setSide} options={[{ value: "BUY", label: "Buy" }, { value: "SELL", label: "Sell" }]} />
+      <SegmentedField<Segment>
+        label="Trade type"
+        value={segment}
+        onChange={chooseSegment}
+        options={[
+          { value: "EQUITY", label: "Equity" },
+          { value: "FUTURE", label: "Futures" },
+          { value: "OPTION", label: "Options" },
+        ]}
+      />
+      {segment === "EQUITY" && (
+        <SegmentedField<Product>
+          label="Product"
+          value={equityProduct}
+          onChange={chooseEquityProduct}
+          hint={equityProduct === "EQUITY_INTRADAY" ? "Mark-to-market: only charges move cash on open; the close settles the price difference. Square off before the day's NAV." : "Ownership: the full traded value moves cash."}
+          options={[
+            { value: "EQUITY_DELIVERY", label: "Delivery" },
+            { value: "EQUITY_INTRADAY", label: "Intraday" },
+          ]}
+        />
+      )}
+      <SegmentedField<Action>
+        label="Position"
+        value={action}
+        onChange={setAction}
+        hint={`Side: ${side === "BUY" ? "Buy" : "Sell"} (set by the position action).`}
+        options={ACTIONS.map((a) => ({
+          value: a.value,
+          label: a.label,
+          disabled: longOnly && (a.value === "OPEN_SHORT" || a.value === "CLOSE_SHORT"),
+          title: longOnly && a.value.endsWith("SHORT") ? "Equity delivery is long-only. Use intraday to short." : undefined,
+        }))}
+      />
+      <InstrumentPicker key={segment} kind={segment} value={instrument} onChange={setInstrument} />
+      <div className="grid gap-4 sm:grid-cols-3">
         <TextField label="Trade date" type="date" value={tradeDate} onChange={setTradeDate} required />
-        <DecimalField label="Quantity" value={quantity} onChange={setQuantity} decimals={4} required />
-        <DecimalField label="Price (₹)" value={price} onChange={setPrice} decimals={4} required />
+        <DecimalField label="Quantity" value={quantity} onChange={setQuantity} decimals={4} required hint={instrument?.lotSize && segment !== "EQUITY" ? `Units; lot size ${instrument.lotSize}.` : undefined} />
+        <DecimalField label={segment === "OPTION" ? "Premium (₹)" : "Price (₹)"} value={price} onChange={setPrice} decimals={4} required />
       </div>
-      <fieldset className="grid gap-4 sm:grid-cols-2">
+      <fieldset className="grid gap-4 sm:grid-cols-3">
         <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Charges from the contract note (₹)</legend>
         {CHARGES.map(([k, label]) => (
           <DecimalField key={k} label={label} value={charges[k] ?? ""} onChange={(v) => setCharges((c) => ({ ...c, [k]: v }))} decimals={2} placeholder="0.00" />
         ))}
       </fieldset>
+      {previewKey && preview && <TicketPreview preview={preview} closing={action.startsWith("CLOSE")} />}
       <TextField label="Contract note / broker reference" value={externalRef} onChange={setExternalRef} maxLength={64} hint="Optional. Prevents the same trade being entered twice." />
       <TextAreaField label="Notes" value={notes} onChange={setNotes} maxLength={1000} rows={2} />
       <label className="flex items-start gap-2 text-[13.5px]">
         <input type="checkbox" checked={execute} onChange={(e) => setExecute(e.target.checked)} className="mt-0.5 h-4 w-4" />
-        Execute now (cash and holdings change on the trade date). Leave unticked to save a draft for review.
+        Execute now (position and cash change on the trade date). Leave unticked to save a draft for review.
       </label>
       {can("trades:backdate") && execute && (
         <fieldset className="space-y-2 rounded-md border border-[var(--qf-line)] p-3">
@@ -113,15 +266,34 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
   const can = useCan();
   const { poolId } = useFund();
   const [status, setStatus] = useState(initialStatus);
-  const [side, setSide] = useState("");
+  const [product, setProduct] = useState("");
+  const [direction, setDirection] = useState("");
+  const [phase, setPhase] = useState("");
+  const [instrument, setInstrument] = useState<InstrumentDto | null>(null);
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
-  const res = usePoolResource<Paged<"trades", Trade>>("trades", { status, side, from, to, page });
+  const res = usePoolResource<Paged<"trades", Trade>>("trades", {
+    status,
+    product,
+    direction,
+    phase,
+    instrument: instrument ? instrument.id : null,
+    from,
+    to,
+    page,
+  });
   const state = resourceState(res, "trades");
   const rows = res.data?.trades ?? [];
-  const dirty = Boolean(status || side || from || to);
+  const dirty = Boolean(status || product || direction || phase || instrument || from || to);
+  const select = (id: string, value: string, set: (v: string) => void, options: ReadonlyArray<[string, string]>) => (
+    <select id={id} className={inputClass} value={value} onChange={(e) => { set(e.target.value); setPage(1); }}>
+      {options.map(([v, l]) => (
+        <option key={v} value={v}>{l}</option>
+      ))}
+    </select>
+  );
 
   return (
     <>
@@ -140,7 +312,10 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
         dirty={dirty}
         onReset={() => {
           setStatus("");
-          setSide("");
+          setProduct("");
+          setDirection("");
+          setPhase("");
+          setInstrument(null);
           setFrom("");
           setTo("");
           setPage(1);
@@ -158,18 +333,25 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
             </select>
           )}
         </FilterField>
-        <FilterField label="Side">
-          {(id) => (
-            <select id={id} className={inputClass} value={side} onChange={(e) => { setSide(e.target.value); setPage(1); }}>
-              <option value="">Both</option>
-              <option value="BUY">Buy</option>
-              <option value="SELL">Sell</option>
-            </select>
-          )}
+        <FilterField label="Product">
+          {(id) =>
+            select(id, product, setProduct, [
+              ["", "All"],
+              ["EQUITY_DELIVERY", "Equity · Delivery"],
+              ["EQUITY_INTRADAY", "Equity · Intraday"],
+              ["FUTURES", "Futures"],
+              ["OPTIONS", "Options"],
+            ])
+          }
         </FilterField>
+        <FilterField label="Direction">{(id) => select(id, direction, setDirection, [["", "Both"], ["LONG", "Long"], ["SHORT", "Short"]])}</FilterField>
+        <FilterField label="Open / close">{(id) => select(id, phase, setPhase, [["", "Both"], ["OPEN", "Opening"], ["CLOSE", "Closing"]])}</FilterField>
         <FilterField label="From">{(id) => <input id={id} type="date" className={inputClass} value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />}</FilterField>
         <FilterField label="To">{(id) => <input id={id} type="date" className={inputClass} value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />}</FilterField>
       </FilterBar>
+      <div className="mb-4 max-w-md">
+        <InstrumentPicker key={instrument ? "set" : "unset"} kind={product === "FUTURES" ? "FUTURE" : product === "OPTIONS" ? "OPTION" : "EQUITY"} value={instrument} onChange={(i) => { setInstrument(i); setPage(1); }} />
+      </div>
       <SectionCard flush>
         {state ??
           (rows.length === 0 ? (
@@ -183,7 +365,9 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
                 rowHref={(r) => recordHref(poolId, "trades", r.id)}
                 columns={[
                   { key: "id", header: "Trade", primary: true, cell: (r) => `#${r.id}` },
-                  { key: "i", header: "Instrument", cell: (r) => `${r.symbol} · ${r.exchange}` },
+                  { key: "i", header: "Instrument", cell: (r) => `${instrumentLabel({ ...r, instrumentType: r.instrument_type, underlying: r.underlying_symbol, expiryDate: r.expiry_date, strikePrice: r.strike_price, optionType: r.option_type })} · ${r.exchange}` },
+                  { key: "pr", header: "Product", cell: (r) => PRODUCT_LABEL[r.product] },
+                  { key: "a", header: "Position", cell: (r) => ACTION_LABEL[r.position_action] },
                   { key: "s", header: "Side", cell: (r) => <SideLabel side={r.side} /> },
                   { key: "d", header: "Trade date", cell: (r) => <DateDisplay value={r.trade_date} /> },
                   { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },

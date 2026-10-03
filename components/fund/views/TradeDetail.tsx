@@ -11,7 +11,7 @@ import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolResource } from "@/components/fund/useResource";
 import { ActionPanel, AuditTrail, DetailGrid, StageTracker, type WorkflowAction } from "@/components/fund/workflow";
-import { SideLabel } from "@/components/fund/views/shared";
+import { SideLabel, ACTION_LABEL, InstrumentSummary, PRODUCT_LABEL } from "@/components/fund/views/shared";
 
 const STAGES = [
   { key: "DRAFT", label: "Draft", hint: "Recorded for review. No effect on cash or holdings." },
@@ -64,7 +64,17 @@ export function TradeDetail({ id }: { id: string }) {
           <SectionCard title="Details">
             <DetailGrid
               items={[
-                { label: "Instrument", value: `${t.symbol} · ${t.exchange}${t.instrument_name ? ` · ${t.instrument_name}` : ""}` },
+                {
+                  label: "Instrument",
+                  value: (
+                    <InstrumentSummary
+                      i={{ symbol: t.symbol, exchange: t.exchange, instrumentType: t.instrument_type, underlying: t.underlying_symbol, expiryDate: t.expiry_date, strikePrice: t.strike_price, optionType: t.option_type }}
+                      name={t.instrument_name}
+                    />
+                  ),
+                },
+                { label: "Product", value: PRODUCT_LABEL[t.product] },
+                { label: "Position action", value: ACTION_LABEL[t.position_action] },
                 { label: "Side", value: <SideLabel side={t.side} /> },
                 { label: "Status", value: <StatusBadge status={t.status} /> },
                 { label: "Trade date", value: <DateDisplay value={t.trade_date} /> },

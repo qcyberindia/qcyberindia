@@ -5,7 +5,7 @@ import { Plus } from "lucide-react";
 import { errorMessage, type InstrumentDto, type WatchItem } from "@/components/fund/api";
 import { resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QualityBadge, StatusBadge } from "@/components/fund/display";
-import { SelectField, TextAreaField, TextField, inputClass } from "@/components/fund/forms";
+import { SelectField, TextAreaField, TextField, inputClass, SegmentedField } from "@/components/fund/forms";
 import { humanize } from "@/components/fund/format";
 import { recordHref } from "@/components/fund/nav";
 import { useNotice } from "@/components/fund/notices";
@@ -14,13 +14,14 @@ import { Disclaimer, EmptyState, PageHeader, SectionCard, btnPrimary } from "@/c
 import { useCan, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
-import { InstrumentPicker } from "@/components/fund/views/shared";
+import { InstrumentPicker, type InstrumentKind } from "@/components/fund/views/shared";
 
 export const WATCH_STATUSES = ["IDEA", "WATCHING", "ACTIVE", "INVALIDATED", "COMPLETED"];
 
 function NewItem({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const [kind, setKind] = useState<InstrumentKind>("EQUITY");
   const [instrument, setInstrument] = useState<InstrumentDto | null>(null);
   const [title, setTitle] = useState("");
   const [thesis, setThesis] = useState("");
@@ -49,7 +50,20 @@ function NewItem({ open, onClose, onDone }: { open: boolean; onClose: () => void
         }
       }}
     >
-      <InstrumentPicker value={instrument} onChange={setInstrument} />
+      <SegmentedField<InstrumentKind>
+        label="Instrument type"
+        value={kind}
+        onChange={(k) => {
+          setKind(k);
+          setInstrument(null);
+        }}
+        options={[
+          { value: "EQUITY", label: "Equity" },
+          { value: "FUTURE", label: "Future" },
+          { value: "OPTION", label: "Option" },
+        ]}
+      />
+      <InstrumentPicker key={kind} kind={kind} value={instrument} onChange={setInstrument} />
       <TextField label="Title" value={title} onChange={setTitle} required maxLength={140} />
       <TextAreaField label="Research notes" value={thesis} onChange={setThesis} maxLength={4000} rows={4} />
       <TextField label="Research link" type="url" value={researchUrl} onChange={setResearchUrl} maxLength={500} hint="Optional http(s) link." />

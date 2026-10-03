@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { errorMessage, type Daily, type Member, type NavSnapshot, type Statement, type StrikeResultDto } from "@/components/fund/api";
+import { errorMessage, type Daily, type Member, type PositionsReportDto, type NavSnapshot, type Statement, type StrikeResultDto } from "@/components/fund/api";
 import { resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
 import { TextField, inputClass } from "@/components/fund/forms";
@@ -13,13 +13,14 @@ import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import { DetailGrid } from "@/components/fund/workflow";
-import { SideLabel, todayIstInput } from "@/components/fund/views/shared";
+import { DirectionLabel, PRODUCT_LABEL, SideLabel, instrumentLabel, todayIstInput } from "@/components/fund/views/shared";
 
-type Tab = "daily" | "nav-history" | "statement" | "tax";
+type Tab = "daily" | "nav-history" | "statement" | "positions" | "tax";
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: "daily", label: "Daily report" },
   { key: "nav-history", label: "NAV history" },
   { key: "statement", label: "Member statement" },
+  { key: "positions", label: "P&L and exposure" },
   { key: "tax", label: "Tax estimate" },
 ];
 
@@ -80,11 +81,12 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
       {p.holdings.length > 0 && (
         <div className="mt-4 overflow-x-auto">
           <DataTable
-            caption="Holdings valued for this NAV"
+            caption="Positions valued for this NAV"
             rows={p.holdings}
-            rowKey={(r) => r.instrumentId}
+            rowKey={(r) => `${r.instrumentId}:${r.product}`}
             columns={[
               { key: "s", header: "Instrument", primary: true, cell: (r) => `${r.symbol} · ${r.exchange}` },
+              { key: "pr", header: "Product", cell: (r) => `${PRODUCT_LABEL[r.product]}${r.direction === "SHORT" ? " · Short" : ""}` },
               { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },
               { key: "p", header: "Closing price", align: "right", cell: (r) => (r.price ? <MoneyDisplay value={r.price} dp={4} /> : <span className="text-[var(--qf-down)]">Missing</span>) },
               { key: "v", header: "Value", align: "right", cell: (r) => <MoneyDisplay value={r.value} /> },
@@ -364,6 +366,68 @@ function TaxTab() {
   );
 }
 
+/** Trading P&L and exposure across products (migration 012 metrics; see ACCOUNTING_RULES.md section 10). */
+function PositionsTab() {
+  const res = usePoolResource<PositionsReportDto>("reports", { type: "positions" });
+  const state = resourceState(res, "the P&L and exposure report");
+  const r = res.data;
+  if (state) return <SectionCard flush>{state}</SectionCard>;
+  if (!r) return null;
+  return (
+    <div className="space-y-6">
+      <SectionCard title="Pool-level trading P&L">
+        <DetailGrid
+          items={[
+            { label: "Realized P&L (net of charges)", value: <MoneyDisplay value={r.realizedPnl} signed /> },
+            { label: "Unrealized P&L", value: r.unrealizedPnl === null ? "Not available: some prices are missing" : <MoneyDisplay value={r.unrealizedPnl} signed /> },
+            { label: "Trading charges", value: <MoneyDisplay value={r.tradingCharges} /> },
+            { label: "Long exposure", value: <MoneyDisplay value={r.exposure?.long ?? null} /> },
+            { label: "Short exposure", value: <MoneyDisplay value={r.exposure?.short ?? null} /> },
+            { label: "Gross exposure", value: <MoneyDisplay value={r.exposure?.gross ?? null} /> },
+            { label: "Net exposure", value: <MoneyDisplay value={r.exposure?.net ?? null} signed /> },
+          ]}
+        />
+        <p className="mt-4 text-[12.5px] text-[var(--qf-ink-soft)]">
+          Exposure is notional (quantity × latest available price); options are counted at premium value, not delta-adjusted. Unrealized P&amp;L uses display prices, not the official NAV prices.
+        </p>
+      </SectionCard>
+      <SectionCard title="By product" flush>
+        {r.byProduct.length === 0 ? (
+          <EmptyState title="No trades yet" description="P&L appears once trades are executed." />
+        ) : (
+          <DataTable
+            caption="P&L by product"
+            rows={r.byProduct}
+            rowKey={(x) => x.product}
+            columns={[
+              { key: "p", header: "Product", primary: true, cell: (x) => PRODUCT_LABEL[x.product] },
+              { key: "o", header: "Open positions", align: "right", cell: (x) => String(x.openPositions) },
+              { key: "r", header: "Realized", align: "right", cell: (x) => <MoneyDisplay value={x.realizedPnl} signed /> },
+              { key: "u", header: "Unrealized", align: "right", cell: (x) => <MoneyDisplay value={x.unrealizedPnl} signed /> },
+              { key: "c", header: "Charges", align: "right", cell: (x) => <MoneyDisplay value={x.charges} /> },
+            ]}
+          />
+        )}
+      </SectionCard>
+      {r.closed.length > 0 && (
+        <SectionCard title="Closed positions" flush>
+          <DataTable
+            caption="Closed positions"
+            rows={r.closed}
+            rowKey={(x) => `${x.instrumentId}:${x.product}`}
+            columns={[
+              { key: "i", header: "Instrument", primary: true, cell: (x) => instrumentLabel(x) },
+              { key: "p", header: "Product", cell: (x) => PRODUCT_LABEL[x.product] },
+              { key: "d", header: "Status", cell: (x) => <DirectionLabel direction={x.direction} /> },
+              { key: "r", header: "Realized", align: "right", cell: (x) => <MoneyDisplay value={x.realizedPnl} signed /> },
+            ]}
+          />
+        </SectionCard>
+      )}
+    </div>
+  );
+}
+
 export function ReportsView() {
   const [tab, setTab] = useState<Tab>("daily");
   return (
@@ -391,6 +455,7 @@ export function ReportsView() {
         {tab === "daily" && <DailyTab />}
         {tab === "nav-history" && <NavHistoryTab />}
         {tab === "statement" && <StatementTab />}
+        {tab === "positions" && <PositionsTab />}
         {tab === "tax" && <TaxTab />}
       </div>
       <div className="mt-8">

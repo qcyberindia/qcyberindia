@@ -5,7 +5,7 @@
 import type { AuditRecord } from "@/lib/fund/audit";
 import type { DashboardData, HoldingsSummary, MemberRow, ContributionListRow, ContributionDetail } from "@/lib/fund/queries";
 import type { WithdrawalDetail, WithdrawalListRow } from "@/lib/fund/services/withdrawals";
-import type { TradeDetail, TradeRecord } from "@/lib/fund/services/trades";
+import type { TradeDetail, TradePreview, TradeRecord } from "@/lib/fund/services/trades";
 import type { ExpenseRecord } from "@/lib/fund/services/expenses";
 import type { Instrument, RecordedPrice } from "@/lib/fund/services/market";
 import type { WatchlistComment, WatchlistItem } from "@/lib/fund/services/watchlist";
@@ -13,7 +13,7 @@ import type { InviteRow, InvitePreview } from "@/lib/fund/services/invites";
 import type { PoolSummary } from "@/lib/fund/services/pools";
 import type { FundSettingsView } from "@/lib/fund/services/settings";
 import type { NavPreview, NavSnapshotRow, StrikeResult } from "@/lib/fund/services/nav";
-import type { DailyReport, StatementReport } from "@/lib/fund/services/reports";
+import type { DailyReport, StatementReport, positionsReport } from "@/lib/fund/services/reports";
 import type { Quote } from "@/lib/market-data";
 
 /** What a server type looks like after JSON.stringify / JSON.parse. */
@@ -36,6 +36,7 @@ export type Withdrawal = Jsonify<WithdrawalListRow>;
 export type WithdrawalDetailDto = Jsonify<WithdrawalDetail>;
 export type Trade = Jsonify<TradeRecord>;
 export type TradeDetailDto = Jsonify<TradeDetail>;
+export type TradePreviewDto = Jsonify<TradePreview>;
 export type Expense = Jsonify<ExpenseRecord>;
 export type InstrumentDto = Instrument;
 export type RecordedPriceDto = Jsonify<RecordedPrice>;
@@ -50,6 +51,7 @@ export type NavSnapshot = Jsonify<NavSnapshotRow>;
 export type StrikeResultDto = Jsonify<StrikeResult>;
 export type Daily = Jsonify<DailyReport>;
 export type Statement = Jsonify<StatementReport>;
+export type PositionsReportDto = Jsonify<Awaited<ReturnType<typeof positionsReport>>>;
 export type Audit = Jsonify<AuditRecord>;
 export type QuoteDto = Quote;
 

@@ -14,8 +14,8 @@ import {
   type InvariantViolation,
 } from "@/lib/accounting/invariants";
 import { parseNavCutoffConfig, type NavCutoffConfig } from "@/lib/accounting/nav-cutoff";
-import { replayPositions, type ReplayTrade } from "@/lib/accounting/portfolio";
-import type { Position } from "@/lib/accounting/holdings";
+import { replayBook, type BookEntry, type PositionAction, type Product } from "@/lib/accounting/positions";
+import type { ReplayTrade } from "@/lib/accounting/portfolio";
 import { one, type Db } from "@/lib/fund/db";
 
 const m = (s: string | null | undefined) => Money.fromDecimalString(s ?? "0");
@@ -120,19 +120,24 @@ type TradeRow = {
   instrument_id: number;
   trade_date: string;
   side: "BUY" | "SELL";
+  product: Product;
+  position_action: PositionAction;
   quantity: string;
   price: string;
   charges: string;
 };
+
+/** An executed trade, usable both by the position engine and the tax estimate. */
+export type AccountingTrade = ReplayTrade & { product: Product; action: PositionAction };
 
 /**
  * Accounting-effective trades (cash and holdings already moved) as of
  * `asOfDate`, or all of them when omitted. A REVERSED trade still counts for
  * dates before it was reversed.
  */
-export async function loadAccountingTrades(db: Db, fundId: number, asOfDate?: string): Promise<ReplayTrade[]> {
+export async function loadAccountingTrades(db: Db, fundId: number, asOfDate?: string): Promise<AccountingTrade[]> {
   const { rows } = await db.query<TradeRow>(
-    `SELECT id, instrument_id, trade_date::text AS trade_date, side, quantity::text AS quantity,
+    `SELECT id, instrument_id, trade_date::text AS trade_date, side, product, position_action, quantity::text AS quantity,
             price::text AS price, (brokerage + stt + gst + stamp_duty + other_charges)::text AS charges
        FROM qfinera_fund_trades
       WHERE fund_id = $1
@@ -150,17 +155,19 @@ export async function loadAccountingTrades(db: Db, fundId: number, asOfDate?: st
     instrumentId: r.instrument_id,
     tradeDate: r.trade_date,
     side: r.side,
+    product: r.product,
+    action: r.position_action,
     quantity: m(r.quantity),
     price: m(r.price),
     charges: m(r.charges),
   }));
 }
 
-/** Positions with non-zero quantity. Throws if the history oversells. */
-export async function loadPositions(db: Db, fundId: number, asOfDate?: string): Promise<Map<number, Position>> {
-  const positions = replayPositions(await loadAccountingTrades(db, fundId, asOfDate));
-  for (const [id, p] of positions) if (p.quantity.isZero()) positions.delete(id);
-  return positions;
+/** Open positions (non-zero quantity), keyed "instrumentId:product". Throws PositionError on an invalid history. */
+export async function loadPositions(db: Db, fundId: number, asOfDate?: string): Promise<Map<string, BookEntry>> {
+  const book = replayBook(await loadAccountingTrades(db, fundId, asOfDate));
+  for (const [key, e] of book) if (e.position.quantity.isZero()) book.delete(key);
+  return book;
 }
 
 export type OfficialPrice = {

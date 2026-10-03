@@ -227,3 +227,52 @@ export function SelectField({
     </FormField>
   );
 }
+
+/**
+ * A small set of mutually exclusive choices shown as buttons (a radio
+ * group): used where every option should be visible at once, e.g. the
+ * trade ticket's segment, product and position action.
+ */
+export function SegmentedField<V extends string>({
+  label,
+  hint,
+  error,
+  required,
+  value,
+  onChange,
+  options,
+}: CommonProps & {
+  value: V | null;
+  onChange: (value: V) => void;
+  options: ReadonlyArray<{ value: V; label: string; disabled?: boolean; title?: string }>;
+}) {
+  return (
+    <FormField label={label} hint={hint} error={error} required={required}>
+      {(p) => (
+        <div id={p.id} role="radiogroup" aria-describedby={p["aria-describedby"]} aria-invalid={p["aria-invalid"]} className="flex flex-wrap gap-1.5">
+          {options.map((o) => {
+            const selected = o.value === value;
+            return (
+              <button
+                key={o.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                disabled={o.disabled}
+                title={o.title}
+                onClick={() => onChange(o.value)}
+                className={`min-h-9 rounded-md border px-3 text-[13px] font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+                  selected
+                    ? "border-[var(--qf-brass)] bg-[var(--qf-brass)]/12 text-[var(--qf-ink)]"
+                    : "border-[var(--qf-line)] text-[var(--qf-ink-soft)] hover:border-[var(--qf-brass)]/60"
+                }`}
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </FormField>
+  );
+}

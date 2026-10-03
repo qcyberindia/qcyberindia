@@ -30,7 +30,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { segment: "contributions", label: "Contributions", icon: "contributions", permission: "contributions:view_own" },
   { segment: "withdrawals", label: "Withdrawals", icon: "withdrawals", permission: "withdrawals:view_own" },
   { segment: "trades", label: "Trades", icon: "trades", permission: "trades:view" },
-  { segment: "holdings", label: "Holdings", icon: "holdings", permission: "holdings:view" },
+  { segment: "holdings", label: "Positions", icon: "holdings", permission: "holdings:view" },
   { segment: "watchlist", label: "Watchlist", icon: "watchlist", permission: "watchlist:view" },
   { segment: "expenses", label: "Expenses", icon: "expenses", permission: "expenses:view" },
   { segment: "reports", label: "Reports", icon: "reports", permission: "reports:view" },
