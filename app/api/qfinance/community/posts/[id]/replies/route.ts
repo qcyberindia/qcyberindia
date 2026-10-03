@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { createQFinanceCommunityReply } from "@/lib/db";
 import { getQFinanceSessionFromRequest } from "@/lib/qfinance-community-auth";
 import { sendQFinanceReplyNotifications } from "@/lib/qfinance-community-notifications";
@@ -31,6 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }
+  // The QFinera gateway caches its Community feed (ISR); refresh it now.
+  revalidatePath("/qfinera");
 
   // Notifications are sent only after the reply is confirmed persisted
   // above, and a failure here must never fail or roll back the reply

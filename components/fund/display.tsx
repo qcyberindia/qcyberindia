@@ -141,7 +141,7 @@ export function QualityBadge({ quality, stale = false }: { quality: string | nul
   };
   const tone: BadgeTone = q === "UNAVAILABLE" || stale ? "negative" : q === "LIVE" || q === "EOD" ? "final" : "pending";
   return (
-    <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TONE_CLASS[tone]}`}>
+    <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-semibold ${TONE_CLASS[tone]}`}>
       {text[q] ?? humanize(q)}
       {stale && q !== "UNAVAILABLE" ? " · stale" : ""}
     </span>

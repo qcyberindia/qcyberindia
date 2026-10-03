@@ -110,11 +110,16 @@ export function InstrumentPicker({
   onChange,
   error,
   kind = "EQUITY",
+  required = true,
+  label: labelOverride,
 }: {
   value: InstrumentDto | null;
   onChange: (i: InstrumentDto | null) => void;
   error?: string | null;
   kind?: InstrumentKind;
+  /** False for filters. */
+  required?: boolean;
+  label?: string;
 }) {
   const { poolId } = useFund();
   const [q, setQ] = useState("");
@@ -124,7 +129,7 @@ export function InstrumentPicker({
   const [results, setResults] = useState<InstrumentDto[] | null>(null);
   const [searching, setSearching] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
-  const label = kind === "EQUITY" ? "Instrument" : "Contract";
+  const label = labelOverride ?? (kind === "EQUITY" ? "Instrument" : "Contract");
 
   async function search() {
     setSearching(true);
@@ -149,12 +154,12 @@ export function InstrumentPicker({
 
   if (value) {
     return (
-      <FormField label={label} required>
+      <FormField label={label} required={required || undefined}>
         {(p) => (
-          <div id={p.id} className="flex items-center justify-between gap-3 rounded-md border border-[var(--qf-line)] px-3 py-2 text-[14px]">
+          <div id={p.id} className="flex min-h-10 items-center justify-between gap-3 rounded-md border border-[var(--qf-line)] px-3 py-2 text-[14px]">
             <InstrumentSummary i={value} name={value.name} />
-            <button type="button" className="text-[13px] text-[var(--qf-brass-dark)] underline" onClick={() => onChange(null)}>
-              Change
+            <button type="button" className="min-h-8 shrink-0 text-[13px] text-[var(--qf-brass-dark)] underline" onClick={() => onChange(null)}>
+              {required ? "Change" : "Clear"}
             </button>
           </div>
         )}
@@ -163,7 +168,7 @@ export function InstrumentPicker({
   }
 
   return (
-    <FormField label={label} required error={error ?? failed} hint={PICKER_HINT[kind]}>
+    <FormField label={label} required={required || undefined} error={error ?? failed} hint={required ? PICKER_HINT[kind] : undefined}>
       {(p) => (
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -182,7 +187,7 @@ export function InstrumentPicker({
               className={inputClass}
               placeholder={kind === "EQUITY" ? "e.g. INFY" : "e.g. NIFTY"}
             />
-            <button type="button" onClick={() => void search()} disabled={searching} className="rounded-md border border-[var(--qf-line)] px-3 text-[13px] font-semibold">
+            <button type="button" onClick={() => void search()} disabled={searching} className="min-h-10 shrink-0 rounded-md border border-[var(--qf-line)] px-3 text-[13px] font-semibold hover:border-[var(--qf-brass)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]">
               {searching ? "Searching…" : "Search"}
             </button>
           </div>

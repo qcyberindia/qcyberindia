@@ -191,7 +191,14 @@ async function selfConfirmation(db: Db, ctx: ServiceCtx, row: ContributionRecord
   return true;
 }
 
-export async function approveContribution(ctx: ServiceCtx, id: number): Promise<ContributionRecord> {
+/** Audit reason for a review step: the reviewer's note, marked when self-confirmed. */
+function reviewReason(self: boolean, note: string | null | undefined): string | null {
+  const n = note?.trim() || null;
+  if (self) return n ? `${SELF_CONFIRMED}. ${n}` : SELF_CONFIRMED;
+  return n;
+}
+
+export async function approveContribution(ctx: ServiceCtx, id: number, note?: string | null): Promise<ContributionRecord> {
   assertPermission(ctx.actor, "contributions:approve");
   return inTransaction(async (db) => {
     await lockFund(db, ctx.fundId);
@@ -217,7 +224,7 @@ export async function approveContribution(ctx: ServiceCtx, id: number): Promise<
       entityId: id,
       before: auditState(before),
       after: { ...auditState(after), self_confirmed: self },
-      reason: self ? SELF_CONFIRMED : null,
+      reason: reviewReason(self, note),
       meta: ctx.meta,
     });
     return after;
@@ -227,7 +234,8 @@ export async function approveContribution(ctx: ServiceCtx, id: number): Promise<
 /** ADMIN confirms the money arrived. Starts the wait for the next EOD NAV. */
 export async function confirmContributionFunds(
   ctx: ServiceCtx,
-  id: number
+  id: number,
+  note?: string | null
 ): Promise<{ contribution: ContributionRecord; applicableNavDate: string }> {
   assertPermission(ctx.actor, "contributions:confirm_funds");
   return inTransaction(async (db) => {
@@ -265,7 +273,7 @@ export async function confirmContributionFunds(
       entityId: id,
       before: auditState(before),
       after: { ...auditState(after), applicable_nav_date: navDate, self_confirmed: self },
-      reason: self ? SELF_CONFIRMED : null,
+      reason: reviewReason(self, note),
       meta: ctx.meta,
     });
     return { contribution: after, applicableNavDate: navDate };

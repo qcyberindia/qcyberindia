@@ -8,7 +8,7 @@ import { PageHeader, SectionCard } from "@/components/fund/parts";
 import { useFund } from "@/components/fund/session";
 import { usePoolResource } from "@/components/fund/useResource";
 import { AuditTrail } from "@/components/fund/workflow";
-import { ContributionReview } from "@/components/fund/views/ContributionReview";
+import { ContributionReview, ContributionReviewActions } from "@/components/fund/views/ContributionReview";
 
 export function ContributionDetail({ id }: { id: string }) {
   const { poolId } = useFund();
@@ -19,14 +19,20 @@ export function ContributionDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader eyebrow="Contribution" title={c ? `Contribution #${c.id}` : "Contribution"} actions={<Link href={`${poolBase(poolId)}/contributions`} className="text-[13px] underline">Back to contributions</Link>} />
+      <PageHeader
+        eyebrow={<Link href={`${poolBase(poolId)}/contributions`} className="underline-offset-2 hover:underline">← Contributions</Link>}
+        title={c ? `Contribution #${c.id}` : "Contribution"}
+        actions={d ? <ContributionReviewActions d={d} onDone={res.reload} /> : undefined}
+      />
       {state ? (
         <SectionCard flush>{state}</SectionCard>
       ) : !c || !d ? (
         <SectionCard>Contribution not found.</SectionCard>
       ) : (
         <div className="space-y-6">
-          <ContributionReview d={d} onDone={res.reload} />
+          <SectionCard flush>
+            <ContributionReview d={d} onDone={res.reload} />
+          </SectionCard>
           {d.audit && (
             <SectionCard title="Audit trail" flush>
               <AuditTrail items={d.audit} />

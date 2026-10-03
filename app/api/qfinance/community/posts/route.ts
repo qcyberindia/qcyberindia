@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import { listQFinanceCommunityPosts, createQFinanceCommunityPost } from "@/lib/db";
 import { getQFinanceSessionFromRequest } from "@/lib/qfinance-community-auth";
 
@@ -32,5 +33,7 @@ export async function POST(req: NextRequest) {
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }
+  // The QFinera gateway caches its Community feed (ISR); refresh it now.
+  revalidatePath("/qfinera");
   return NextResponse.json({ ok: true, id: result.id });
 }

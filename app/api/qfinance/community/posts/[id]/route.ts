@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidatePath } from "next/cache";
 import {
   getQFinanceCommunityPost,
   getQFinancePostAuthorId,
@@ -61,6 +62,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }
+  // The QFinera gateway caches its Community feed (ISR); refresh it now.
+  revalidatePath("/qfinera");
   return NextResponse.json({ ok: true });
 }
 
@@ -90,5 +93,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   if (!result.ok) {
     return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
   }
+  // The QFinera gateway caches its Community feed (ISR); refresh it now.
+  revalidatePath("/qfinera");
   return NextResponse.json({ ok: true });
 }

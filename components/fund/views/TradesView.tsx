@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Plus } from "lucide-react";
 import { apiFetch, errorMessage, poolApi, type InstrumentDto, type Paged, type Trade, type TradePreviewDto } from "@/components/fund/api";
 import { isPositiveDecimal, resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
@@ -339,10 +340,20 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
         <FilterField label="Open / close">{(id) => select(id, phase, setPhase, [["", "Both"], ["OPEN", "Opening"], ["CLOSE", "Closing"]])}</FilterField>
         <FilterField label="From">{(id) => <input id={id} type="date" className={inputClass} value={from} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />}</FilterField>
         <FilterField label="To">{(id) => <input id={id} type="date" className={inputClass} value={to} onChange={(e) => { setTo(e.target.value); setPage(1); }} />}</FilterField>
+        <div className="w-full sm:max-w-md">
+          <InstrumentPicker
+            key={instrument ? "set" : "unset"}
+            kind={product === "FUTURES" ? "FUTURE" : product === "OPTIONS" ? "OPTION" : "EQUITY"}
+            required={false}
+            label="Filter by instrument"
+            value={instrument}
+            onChange={(i) => {
+              setInstrument(i);
+              setPage(1);
+            }}
+          />
+        </div>
       </FilterBar>
-      <div className="mb-4 max-w-md">
-        <InstrumentPicker key={instrument ? "set" : "unset"} kind={product === "FUTURES" ? "FUTURE" : product === "OPTIONS" ? "OPTION" : "EQUITY"} value={instrument} onChange={(i) => { setInstrument(i); setPage(1); }} />
-      </div>
       <SectionCard flush>
         {state ??
           (rows.length === 0 ? (
@@ -355,17 +366,68 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
                 rowKey={(r) => r.id}
                 rowHref={(r) => recordHref(poolId, "trades", r.id)}
                 columns={[
-                  { key: "id", header: "Trade", primary: true, cell: (r) => `#${r.id}` },
-                  { key: "i", header: "Instrument", cell: (r) => `${instrumentLabel({ ...r, instrumentType: r.instrument_type, underlying: r.underlying_symbol, expiryDate: r.expiry_date, strikePrice: r.strike_price, optionType: r.option_type })} · ${r.exchange}` },
-                  { key: "pr", header: "Product", cell: (r) => PRODUCT_LABEL[r.product] },
-                  { key: "a", header: "Position", cell: (r) => ACTION_LABEL[r.position_action] },
-                  { key: "s", header: "Side", cell: (r) => <SideLabel side={r.side} /> },
-                  { key: "d", header: "Trade date", cell: (r) => <DateDisplay value={r.trade_date} /> },
-                  { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },
-                  { key: "p", header: "Price", align: "right", cell: (r) => <MoneyDisplay value={r.price} dp={4} /> },
-                  { key: "n", header: "Net value", align: "right", cell: (r) => <MoneyDisplay value={r.net_value} /> },
-                  { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} label={r.is_backdated ? `${r.status.charAt(0) + r.status.slice(1).toLowerCase()} (backdated)` : undefined} /> },
+                  {
+                    key: "i",
+                    header: "Trade",
+                    primary: true,
+                    cell: (r) => (
+                      <span className="md:whitespace-nowrap">
+                        {instrumentLabel({ ...r, instrumentType: r.instrument_type, underlying: r.underlying_symbol, expiryDate: r.expiry_date, strikePrice: r.strike_price, optionType: r.option_type })}
+                        <span className="ml-1.5 text-[12px] font-normal text-[var(--qf-ink-soft)]">#{r.id}</span>
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "pr",
+                    header: "Product · position",
+                    cell: (r) => (
+                      <span className="whitespace-nowrap">
+                        {PRODUCT_LABEL[r.product]}
+                        <span className="block text-[12px] text-[var(--qf-ink-soft)]">
+                          {ACTION_LABEL[r.position_action]} · <SideLabel side={r.side} />
+                        </span>
+                      </span>
+                    ),
+                  },
+                  { key: "d", header: "Date", cell: (r) => <span className="whitespace-nowrap"><DateDisplay value={r.trade_date} /></span> },
+                  {
+                    key: "q",
+                    header: "Qty @ price",
+                    align: "right",
+                    cell: (r) => (
+                      <span className="whitespace-nowrap">
+                        <QuantityDisplay value={r.quantity} /> <span className="text-[var(--qf-ink-soft)]">@</span> <MoneyDisplay value={r.price} dp={4} />
+                      </span>
+                    ),
+                  },
+                  { key: "n", header: "Net value", align: "right", hideOnMobile: true, cell: (r) => <span className="whitespace-nowrap"><MoneyDisplay value={r.net_value} /></span> },
+                  {
+                    key: "st",
+                    header: "Status",
+                    cell: (r) => (
+                      <span className="flex flex-wrap items-center gap-1">
+                        <StatusBadge status={r.status} label={r.is_backdated ? `${r.status.charAt(0) + r.status.slice(1).toLowerCase()} (backdated)` : undefined} />
+                        {r.correction_count > 0 && <span className="text-[11.5px] text-[var(--qf-ink-soft)]" title="Corrected by an administrator; see the revision history">corrected</span>}
+                      </span>
+                    ),
+                  },
                 ]}
+                rowAction={
+                  can("trades:correct")
+                    ? (r) =>
+                        ["EXECUTED", "SETTLED", "FINALIZED"].includes(r.status) ? (
+                          <Link
+                            href={`${recordHref(poolId, "trades", r.id)}?edit=1`}
+                            title="Edit trade (administrator correction)"
+                            aria-label={`Edit trade #${r.id}`}
+                            className="inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-md border border-[var(--qf-line)] px-2.5 text-[13px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)] hover:bg-[var(--qf-cream-1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]"
+                          >
+                            <Pencil size={14} aria-hidden="true" />
+                            <span className="md:sr-only">Edit</span>
+                          </Link>
+                        ) : null
+                    : undefined
+                }
               />
               <Pagination page={page} pageSize={res.data?.pageSize ?? 25} total={res.data?.total ?? null} count={rows.length} onPage={setPage} />
             </>

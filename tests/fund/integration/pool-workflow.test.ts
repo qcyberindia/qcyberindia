@@ -44,10 +44,10 @@ suite("pool workflow: contribution review and trade corrections (real database)"
   async function step(user: TestUser, id: number, action: string, extra: Record<string, unknown> = {}) {
     return json(await contributionRoute.POST(request(user, `/api/qfinera/pools/${poolA}/contributions/${id}`, { body: { action, ...extra } }), PI(poolA, id)));
   }
-  async function upload(user: TestUser, id: number, bytes: Buffer, fileName = "upi.png") {
+  async function upload(user: TestUser, id: number, bytes: Buffer, fileName = "upi.png", kind?: string) {
     return json(
       await proofsRoute.POST(
-        request(user, `/api/qfinera/pools/${poolA}/contributions/${id}/proofs`, { body: { fileName, dataBase64: bytes.toString("base64") } }),
+        request(user, `/api/qfinera/pools/${poolA}/contributions/${id}/proofs`, { body: { fileName, dataBase64: bytes.toString("base64"), ...(kind ? { kind } : {}) } }),
         PI(poolA, id)
       )
     );
@@ -104,7 +104,7 @@ suite("pool workflow: contribution review and trade corrections (real database)"
 
     const up = await upload(bob, bobContribution, PNG, "../../etc/upi screenshot.png");
     expect(up.status).toBe(201);
-    expect(up.body.data.proof).toMatchObject({ fileName: "upi screenshot.png", contentType: "image/png", sizeBytes: PNG.length });
+    expect(up.body.data.proof).toMatchObject({ kind: "PAYMENT", fileName: "upi screenshot.png", contentType: "image/png", sizeBytes: PNG.length });
     proofId = up.body.data.proof.id;
     expect((await upload(bob, bobContribution, PNG)).status).toBe(409); // same file twice
   });
@@ -147,7 +147,55 @@ suite("pool workflow: contribution review and trade corrections (real database)"
     const confirmed = await step(alice, bobContribution, "confirm-funds");
     expect(confirmed.status).toBe(200);
     expect(confirmed.body.data.contribution.status).toBe("AWAITING_NAV");
-    expect((await upload(bob, bobContribution, Buffer.concat([PNG, Buffer.from([0])]))).status).toBe(201); // still open
+    // Payment proof closes once funds are confirmed; received proof stays open.
+    expect((await upload(bob, bobContribution, Buffer.concat([PNG, Buffer.from([0])]))).status).toBe(409);
+  });
+
+  it("payment proof is the contributor's; received / verified proof is a manager's or admin's", async () => {
+    const c = await contribute(eve, { amount: "500.00", paymentMethod: "UPI", utr: "UTR-E-9" });
+    const id = c.body.data.contribution.id;
+    // An admin cannot attach the contributor's payment proof...
+    const adminPayment = await upload(alice, id, PNG, "x.png", "PAYMENT");
+    expect(adminPayment.status).toBe(403);
+    expect(adminPayment.body.error.message).toMatch(/received \/ verified proof/);
+    // ...and a contributor cannot attach received proof.
+    expect((await upload(eve, id, PNG, "x.png", "RECEIVED")).status).toBe(403);
+    expect((await upload(eve, id, PNG, "gpay.png")).status).toBe(201);
+
+    const received = await upload(alice, id, Buffer.concat([PNG, Buffer.from([1])]), "bank-statement.png", "RECEIVED");
+    expect(received.status).toBe(201);
+    expect(received.body.data.proof).toMatchObject({ kind: "RECEIVED", fileName: "bank-statement.png" });
+    expect((await upload(carol, id, Buffer.concat([PNG, Buffer.from([2])]), "manager-check.png", "RECEIVED")).status).toBe(201);
+    expect((await upload(eve, id, PNG, "x.png", "SOMETHING")).status).toBe(400);
+
+    const detail = await json(await contributionRoute.GET(request(alice, `/api/qfinera/pools/${poolA}/contributions/${id}`), PI(poolA, id)));
+    expect(detail.body.data.proofs.map((p: { kind: string }) => p.kind)).toEqual(["PAYMENT", "RECEIVED", "RECEIVED"]);
+    // The contributor sees the received proof too (it is about their money).
+    expect((await download(eve, id, received.body.data.proof.id)).status).toBe(200);
+    const { rows } = await db.query("SELECT action FROM qfinera_fund_audit_log WHERE entity_type = 'contribution' AND entity_id = $1 AND action LIKE '%proof%' ORDER BY id", [id]);
+    expect(rows.map((r) => r.action)).toEqual(["contribution.proof_added", "contribution.received_proof_added", "contribution.received_proof_added"]);
+  });
+
+  it("a manager who recorded a contribution for a member can attach its payment proof", async () => {
+    const c = await json(
+      await contributionsRoute.POST(
+        request(carol, `/api/qfinera/pools/${poolA}/contributions`, { body: { amount: "700.00", paymentDate: "2026-08-31", memberId: eve.id, paymentMethod: "CASH" } }),
+        P(poolA)
+      )
+    );
+    expect((await upload(carol, c.body.data.contribution.id, PNG, "cash-receipt.png")).status).toBe(201);
+  });
+
+  it("review notes are recorded with approval and confirmation", async () => {
+    const c = await contribute(eve, { amount: "900.00", paymentMethod: "NEFT", utr: "UTR-E-10" });
+    const id = c.body.data.contribution.id;
+    expect((await step(alice, id, "approve", { reason: "Matches statement line 14" })).status).toBe(200);
+    expect((await step(alice, id, "confirm-funds", { reason: "Credited 03 Oct" })).status).toBe(200);
+    const { rows } = await db.query("SELECT action, diff->>'reason' AS reason FROM qfinera_fund_audit_log WHERE entity_type = 'contribution' AND entity_id = $1 ORDER BY id", [id]);
+    expect(rows.slice(1)).toEqual([
+      { action: "contribution.approved", reason: "Matches statement line 14" },
+      { action: "contribution.funds_confirmed", reason: "Credited 03 Oct" },
+    ]);
   });
 
   it("a rejected contribution needs a reason and allocates nothing", async () => {

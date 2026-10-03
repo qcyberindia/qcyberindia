@@ -63,6 +63,61 @@ export function StageTracker({
   );
 }
 
+/**
+ * Compact horizontal progress: numbered dots with short labels. For narrow
+ * panels (review drawer) and record headers, where StageTracker's cards
+ * would be cramped. Terminal states render as a single closed badge.
+ */
+export function StepIndicator({
+  stages,
+  status,
+  terminal = ["REJECTED", "CANCELLED", "REVERSED"],
+}: {
+  stages: ReadonlyArray<Stage>;
+  status: string;
+  terminal?: readonly string[];
+}) {
+  if (terminal.includes(status)) {
+    return (
+      <p className="flex flex-wrap items-center gap-2 text-[13.5px] text-[var(--qf-ink-soft)]">
+        <StatusBadge status={status} /> Closed. This record will not progress further.
+      </p>
+    );
+  }
+  const current = stages.findIndex((s) => s.key === status);
+  const last = stages.length - 1;
+  return (
+    <ol className="flex flex-wrap items-start gap-y-3" aria-label="Progress">
+      {stages.map((s, i) => {
+        const done = current > i || (current === last && i === last);
+        const active = current === i && !done;
+        return (
+          <li key={s.key} aria-current={active ? "step" : undefined} title={s.hint} className="flex min-w-0 flex-1 basis-[5.5rem] flex-col items-start gap-1.5">
+            <div className="flex w-full items-center">
+              <span
+                className={`inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11px] font-semibold ${
+                  done
+                    ? "border-[var(--qf-up)] bg-[var(--qf-up)] text-[var(--qf-cream-0)]"
+                    : active
+                      ? "border-[var(--qf-brass)] bg-[var(--qf-brass)]/15 text-[var(--qf-brass-dark)]"
+                      : "border-[var(--qf-line)] text-[var(--qf-ink-soft)]"
+                }`}
+              >
+                {done ? <Check size={13} aria-hidden="true" /> : i + 1}
+              </span>
+              {i < last && <span aria-hidden="true" className={`mx-1.5 h-px flex-1 ${done ? "bg-[var(--qf-up)]/60" : "bg-[var(--qf-line)]"}`} />}
+            </div>
+            <span className={`pr-2 text-[12px] leading-tight ${active ? "font-semibold text-[var(--qf-ink)]" : "text-[var(--qf-ink-soft)]"}`}>
+              {s.label}
+              <span className="sr-only">{done ? " (complete)" : active ? " (current step)" : " (upcoming)"}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /** Label/value pairs for detail pages. */
 export function DetailGrid({ items }: { items: ReadonlyArray<{ label: string; value: React.ReactNode }> }) {
   return (
@@ -263,6 +318,39 @@ export function ActionPanel({
   );
 }
 
+/**
+ * The same actions as ActionPanel, as a bare button row (no card): for
+ * drawer footers and record headers. The first `primary` action is the
+ * obvious next step; the rest follow as secondary/danger buttons.
+ */
+export function ActionBar({ path, actions, onDone, empty }: { path: string; actions: ReadonlyArray<WorkflowAction>; onDone: () => void; empty?: React.ReactNode }) {
+  const [selected, setSelected] = useState<WorkflowAction | null>(null);
+  if (actions.length === 0) return <>{empty ?? null}</>;
+  return (
+    <>
+      {/* Phones: the next step full width on top, the rest two per row. Wider: one row, next step last (rightmost). */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+        {actions.map((a, i) => {
+          const primary = (a.variant ?? "primary") === "primary" && actions.findIndex((x) => (x.variant ?? "primary") === "primary") === i;
+          return (
+            <button
+              key={a.key}
+              type="button"
+              className={`${VARIANT[a.variant ?? "primary"]} ${primary ? "order-first col-span-2 sm:order-last" : ""}`}
+              onClick={() => setSelected(a)}
+            >
+              {a.label}
+            </button>
+          );
+        })}
+      </div>
+      <Modal open={selected !== null} onClose={() => setSelected(null)} title={selected?.title ?? ""}>
+        {selected && <ActionForm action={selected} path={path} onDone={onDone} onClose={() => setSelected(null)} />}
+      </Modal>
+    </>
+  );
+}
+
 function renderValue(v: unknown): string {
   if (v === null || v === undefined) return "—";
   return typeof v === "object" ? JSON.stringify(v) : String(v);
@@ -276,18 +364,17 @@ export function AuditTrail({ items }: { items: ReadonlyArray<Audit> }) {
       {items.map((e) => {
         const changes = Object.entries(e.changes ?? {});
         return (
-          <li key={e.id} className="px-4 py-4 sm:px-5">
-            <div className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-              <p className="text-[14.5px] font-semibold text-[var(--qf-ink)]">
-                {humanize(e.action.replace(".", " "))}
-                <span className="ml-2 text-[12.5px] font-normal text-[var(--qf-ink-soft)]">
+          <li key={e.id} className="px-4 py-3 sm:px-5">
+            <div className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+              <p className="text-[14px] text-[var(--qf-ink)]">
+                <span className="font-semibold">{humanize(e.action.replace(".", " "))}</span>
+                <span className="ml-2 text-[12.5px] text-[var(--qf-ink-soft)]">
                   {humanize(e.entityType)}
-                  {e.entityId !== null ? ` #${e.entityId}` : ""}
+                  {e.entityId !== null ? ` #${e.entityId}` : ""} · by {e.actorName ?? (e.userId ? `User #${e.userId}` : "System")}
                 </span>
               </p>
-              <DateDisplay value={e.createdAt} className="text-[12.5px] text-[var(--qf-ink-soft)]" />
+              <DateDisplay value={e.createdAt} className="shrink-0 text-[12.5px] text-[var(--qf-ink-soft)]" />
             </div>
-            <p className="mt-0.5 text-[13px] text-[var(--qf-ink-soft)]">by {e.actorName ?? (e.userId ? `User #${e.userId}` : "System")}</p>
             {e.reason && (
               <p className="mt-2 rounded-md bg-[var(--qf-cream-1)] px-3 py-2 text-[13px] text-[var(--qf-ink)]">
                 <span className="font-semibold">Reason: </span>
@@ -295,8 +382,8 @@ export function AuditTrail({ items }: { items: ReadonlyArray<Audit> }) {
               </p>
             )}
             {changes.length > 0 && (
-              <details className="mt-2 text-[13px]">
-                <summary className="cursor-pointer text-[var(--qf-brass-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]">
+              <details className="mt-1 text-[13px]">
+                <summary className="inline-flex min-h-7 cursor-pointer items-center text-[var(--qf-brass-dark)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]">
                   {changes.length} field{changes.length === 1 ? "" : "s"} changed
                 </summary>
                 <ul className="mt-2 space-y-1">

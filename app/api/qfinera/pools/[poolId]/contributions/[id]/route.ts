@@ -32,9 +32,9 @@ export async function POST(req: NextRequest, { params }: PoolItemParams) {
       const cid = itemId(id);
       switch (parseEnum(body.action, "action", ACTIONS)) {
         case "approve":
-          return jsonOk({ contribution: await approveContribution(sctx, cid) });
+          return jsonOk({ contribution: await approveContribution(sctx, cid, parseOptionalText(body.reason, "reason", 500)) });
         case "confirm-funds":
-          return jsonOk(await confirmContributionFunds(sctx, cid));
+          return jsonOk(await confirmContributionFunds(sctx, cid, parseOptionalText(body.reason, "reason", 500)));
         case "reject":
           return jsonOk({ contribution: await rejectContribution(sctx, cid, parseText(body.reason, "reason", { min: 3, max: 500 })) });
         case "cancel":

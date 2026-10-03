@@ -1,4 +1,11 @@
-// Payment proof files for contributions (migration 013).
+// Proof files for contributions (migrations 013, 014). Two kinds:
+//
+//   PAYMENT   "Payment proof": the contributor's evidence that they paid.
+//             Attached by the contributor (or the manager who recorded the
+//             contribution on their behalf) while it is pending or approved.
+//   RECEIVED  "Received / verified proof": an ADMIN's or MANAGER's evidence
+//             that the money arrived, checked against the pool's bank
+//             statement. Attached from the review workflow, until finalized.
 //
 // Stored in the database, never behind a public URL. Only the contributor
 // and roles that see every contribution (MANAGER/ADMIN) can list or
@@ -10,17 +17,24 @@ import { createHash } from "node:crypto";
 import { writeAudit } from "@/lib/fund/audit";
 import { inTransaction, one, type Db } from "@/lib/fund/db";
 import { conflictError, notFoundError, validationError } from "@/lib/fund/errors";
-import { canViewMemberRecord, hasPermission, type FundActor } from "@/lib/fund/rbac";
+import { ForbiddenError, canViewMemberRecord, hasPermission, type FundActor } from "@/lib/fund/rbac";
 import type { ServiceCtx } from "@/lib/fund/services/types";
 
 export const MAX_PROOF_BYTES = 2 * 1024 * 1024;
-/** Proofs can be added until units are allocated (or the request is closed). */
-const OPEN_STATUSES = ["PENDING", "APPROVED", "AWAITING_NAV"];
+export type ProofKind = "PAYMENT" | "RECEIVED";
+export const PROOF_KINDS: readonly ProofKind[] = ["PAYMENT", "RECEIVED"];
+
+/** When each kind may be attached. */
+const OPEN_STATUSES: Record<ProofKind, readonly string[]> = {
+  PAYMENT: ["PENDING", "APPROVED"],
+  RECEIVED: ["PENDING", "APPROVED", "AWAITING_NAV", "FINALIZED"],
+};
 
 export type ProofContentType = "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
 
 export type ProofMeta = {
   id: number;
+  kind: ProofKind;
   fileName: string;
   contentType: ProofContentType;
   sizeBytes: number;
@@ -43,7 +57,7 @@ export function sniffProofType(bytes: Uint8Array): ProofContentType | null {
 export function cleanFileName(raw: string): string {
   const base = raw.split(/[\\/]/).pop() ?? "";
   const cleaned = base.replace(/[\u0000-\u001f\u007f"]/g, "").trim().slice(0, 200);
-  return cleaned || "payment-proof";
+  return cleaned || "proof";
 }
 
 /** Decodes base64 strictly. */
@@ -57,9 +71,9 @@ export function decodeProof(dataBase64: string): Buffer {
 }
 
 async function loadContribution(db: Db, fundId: number, id: number) {
-  return one<{ id: number; member_id: number; status: string }>(
+  return one<{ id: number; member_id: number; created_by: number; status: string }>(
     db,
-    "SELECT id, member_id, status FROM qfinera_fund_contributions WHERE id = $1 AND fund_id = $2",
+    "SELECT id, member_id, created_by, status FROM qfinera_fund_contributions WHERE id = $1 AND fund_id = $2",
     [id, fundId]
   );
 }
@@ -71,7 +85,7 @@ function canSee(actor: FundActor, memberId: number): boolean {
 export async function addContributionProof(
   ctx: ServiceCtx,
   contributionId: number,
-  input: { fileName: string; dataBase64: string }
+  input: { fileName: string; dataBase64: string; kind: ProofKind }
 ): Promise<ProofMeta> {
   const bytes = decodeProof(input.dataBase64);
   const contentType = sniffProofType(bytes);
@@ -83,13 +97,22 @@ export async function addContributionProof(
 
   return inTransaction(async (db) => {
     const c = await loadContribution(db, ctx.fundId, contributionId);
-    // The contributor, or someone who may record contributions for members.
     if (!c || !canSee(ctx.actor, c.member_id)) throw notFoundError("Contribution");
-    if (c.member_id !== ctx.actor.userId && !hasPermission(ctx.actor, "contributions:create_for_member")) {
-      throw notFoundError("Contribution");
+    if (input.kind === "PAYMENT") {
+      // The contributor, or the manager/admin who recorded it for them.
+      const onBehalf = c.created_by === ctx.actor.userId && hasPermission(ctx.actor, "contributions:create_for_member");
+      if (c.member_id !== ctx.actor.userId && !onBehalf) {
+        throw new ForbiddenError("Only the contributor attaches payment proof. Attach a received / verified proof instead.");
+      }
+    } else if (!hasPermission(ctx.actor, "contributions:view_all")) {
+      throw new ForbiddenError("Only a manager or administrator attaches received / verified proof.");
     }
-    if (!OPEN_STATUSES.includes(c.status)) {
-      throw conflictError(`Proof can no longer be added: this contribution is ${c.status}.`);
+    if (!OPEN_STATUSES[input.kind].includes(c.status)) {
+      throw conflictError(
+        input.kind === "PAYMENT"
+          ? `Payment proof can only be added before funds are confirmed (this contribution is ${c.status}).`
+          : `Received proof can no longer be added: this contribution is ${c.status}.`
+      );
     }
     const dup = await one<{ id: number }>(
       db,
@@ -100,22 +123,23 @@ export async function addContributionProof(
     const row = await one<{ id: number; created_at: Date }>(
       db,
       `INSERT INTO qfinera_fund_contribution_proofs
-         (fund_id, contribution_id, file_name, content_type, size_bytes, sha256, data, uploaded_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`,
-      [ctx.fundId, contributionId, fileName, contentType, bytes.length, sha256, bytes, ctx.actor.userId]
+         (fund_id, contribution_id, file_name, content_type, size_bytes, sha256, data, uploaded_by, kind)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, created_at`,
+      [ctx.fundId, contributionId, fileName, contentType, bytes.length, sha256, bytes, ctx.actor.userId, input.kind]
     );
     if (!row) throw new Error("proof insert returned no row");
     await writeAudit(db, {
       fundId: ctx.fundId,
       userId: ctx.actor.userId,
-      action: "contribution.proof_added",
+      action: input.kind === "PAYMENT" ? "contribution.proof_added" : "contribution.received_proof_added",
       entityType: "contribution",
       entityId: contributionId,
-      after: { proof_id: row.id, file_name: fileName, content_type: contentType, size_bytes: bytes.length, sha256 },
+      after: { proof_id: row.id, kind: input.kind, file_name: fileName, content_type: contentType, size_bytes: bytes.length, sha256 },
       meta: ctx.meta,
     });
     return {
       id: row.id,
+      kind: input.kind,
       fileName,
       contentType,
       sizeBytes: bytes.length,
@@ -129,7 +153,7 @@ export async function addContributionProof(
 /** Proof metadata (no bytes) for a contribution the caller may already see. */
 export async function listContributionProofs(db: Db, fundId: number, contributionId: number): Promise<ProofMeta[]> {
   const { rows } = await db.query<ProofMeta>(
-    `SELECT p.id, p.file_name AS "fileName", p.content_type AS "contentType", p.size_bytes AS "sizeBytes",
+    `SELECT p.id, p.kind, p.file_name AS "fileName", p.content_type AS "contentType", p.size_bytes AS "sizeBytes",
             p.uploaded_by AS "uploadedBy", u.display_name AS "uploaderName", p.created_at AS "createdAt"
        FROM qfinera_fund_contribution_proofs p
        LEFT JOIN qfinance_users u ON u.id = p.uploaded_by

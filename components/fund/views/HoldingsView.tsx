@@ -14,8 +14,8 @@ import { usePoolMutation, usePoolResource } from "@/components/fund/useResource"
 import {
   DirectionLabel,
   InstrumentPicker,
-  InstrumentSummary,
   PRODUCT_LABEL,
+  instrumentLabel,
   todayIstInput,
   type InstrumentKind,
 } from "@/components/fund/views/shared";
@@ -177,7 +177,7 @@ type Filter = "ALL" | "LONG" | "SHORT" | "CLOSED";
 type Category = "ALL" | "EQUITY" | "FUTURE" | "OPTION";
 type Row = Holdings["rows"][number];
 
-function PositionsTable({ rows, caption, closed }: { rows: readonly Row[]; caption: string; closed: boolean }) {
+function PositionsTable({ rows, caption, closed, delivery = false }: { rows: readonly Row[]; caption: string; closed: boolean; delivery?: boolean }) {
   return (
     <DataTable
       caption={caption}
@@ -189,37 +189,35 @@ function PositionsTable({ rows, caption, closed }: { rows: readonly Row[]; capti
           header: "Instrument",
           primary: true,
           cell: (r) => (
-            <span>
-              <InstrumentSummary i={r} />
-              <span className="block text-[12px] font-normal text-[var(--qf-ink-soft)]">
-                {PRODUCT_LABEL[r.product]}
-                {r.instrumentType === "EQUITY" && r.name ? ` · ${r.name}` : ""}
+            <span className="block max-w-[16rem]">
+              <span className="whitespace-nowrap font-semibold">{instrumentLabel(r)}</span>
+              <span className="block truncate text-[12px] font-normal text-[var(--qf-ink-soft)]" title={r.name ?? undefined}>
+                {r.exchange} · {r.product === "EQUITY_DELIVERY" ? (r.name ?? "Equity · Delivery") : PRODUCT_LABEL[r.product]}
               </span>
             </span>
           ),
         },
-        { key: "d", header: "Direction", cell: (r) => <DirectionLabel direction={r.direction} /> },
+        ...(delivery ? [] : [{ key: "d", header: closed ? "Status" : "Direction", cell: (r: Row) => <DirectionLabel direction={r.direction} /> }]),
         ...(closed
           ? []
           : [
-              { key: "q", header: "Quantity", align: "right" as const, cell: (r: Row) => <QuantityDisplay value={r.quantity} /> },
+              { key: "q", header: "Qty", align: "right" as const, cell: (r: Row) => <QuantityDisplay value={r.quantity} /> },
               { key: "a", header: "Entry", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.averageEntryPrice} dp={4} /> },
               {
                 key: "p",
                 header: "LTP",
                 align: "right" as const,
                 cell: (r: Row) => (
-                  <span className="flex flex-col items-end gap-1">
+                  <span className="flex flex-col items-end gap-1" title={r.priceAsOf ? `Price as of ${new Date(r.priceAsOf).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST` : (r.priceUnavailableReason ?? undefined)}>
                     <MoneyDisplay value={r.price} dp={4} />
                     <QualityBadge quality={r.priceQuality} stale={r.priceStale} />
+                    {r.priceAsOf && (
+                      <span className="whitespace-nowrap text-[11.5px] text-[var(--qf-ink-soft)]">
+                        <DateDisplay value={r.priceAsOf} />
+                      </span>
+                    )}
                   </span>
                 ),
-              },
-              {
-                key: "t",
-                header: "Price as of",
-                hideOnMobile: true,
-                cell: (r: Row) => (r.priceAsOf ? <DateDisplay value={r.priceAsOf} /> : <span className="text-[12.5px] text-[var(--qf-ink-soft)]">{r.priceUnavailableReason}</span>),
               },
               { key: "v", header: "Value in fund", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.marketValue} signed={r.direction === "SHORT"} /> },
               { key: "u", header: "Unrealized", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.unrealizedPnl} signed /> },
@@ -327,7 +325,7 @@ export function HoldingsView() {
                   {holdings.length === 0 ? (
                     <EmptyState title="No holdings" description="Delivery holdings appear once a delivery buy is executed." />
                   ) : (
-                    <PositionsTable rows={holdings} caption="Equity delivery holdings" closed={false} />
+                    <PositionsTable rows={holdings} caption="Equity delivery holdings" closed={false} delivery />
                   )}
                 </SectionCard>
               )}

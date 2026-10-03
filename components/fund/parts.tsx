@@ -19,14 +19,15 @@ export function PageHeader({
 }: {
   title: string;
   description?: string;
-  eyebrow?: string;
+  /** Small line above the title (a section name or a back link). */
+  eyebrow?: React.ReactNode;
   actions?: React.ReactNode;
 }) {
   return (
     <header className="mb-7 flex flex-col gap-4 border-b border-[var(--qf-line)]/70 pb-5 sm:flex-row sm:items-end sm:justify-between">
       <div className="min-w-0">
         {eyebrow && (
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">{eyebrow}</p>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">{eyebrow}</div>
         )}
         <h1 className="mt-1 font-display text-[26px] font-semibold leading-tight tracking-tight text-[var(--qf-ink)] sm:text-[32px]">
           {title}

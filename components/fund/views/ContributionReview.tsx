@@ -1,18 +1,21 @@
 "use client";
 
-// Contribution review: payment details, proof files and the lifecycle
-// actions the viewer may take. Shared by the contribution page and the
-// Review drawer on the contributions list.
+// Contribution review: one flowing record (summary, next step, progress,
+// payment details, the contributor's payment proof, the administrator's
+// received / verified proof, review history) plus the lifecycle actions the
+// viewer may take. Used by the Review drawer on the contributions list and
+// by the contribution page.
 import { useState } from "react";
-import { FileText, Paperclip } from "lucide-react";
+import { ArrowRight, FileText, Paperclip, ShieldCheck } from "lucide-react";
 import { errorMessage, poolApi, type ContributionDetailDto } from "@/components/fund/api";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
-import { FormField, inputClass } from "@/components/fund/forms";
+import { formatTimestampIst, humanize } from "@/components/fund/format";
 import { useNotice } from "@/components/fund/notices";
-import { SectionCard, btnSecondary } from "@/components/fund/parts";
+import { btnSecondary } from "@/components/fund/parts";
 import { useCan, useFund } from "@/components/fund/session";
+import { ProofDropzone, formatBytes, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
 import { usePoolMutation } from "@/components/fund/useResource";
-import { ActionPanel, DetailGrid, StageTracker, type WorkflowAction } from "@/components/fund/workflow";
+import { ActionBar, StepIndicator, type WorkflowAction } from "@/components/fund/workflow";
 
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
   UPI: "UPI",
@@ -33,47 +36,29 @@ export const CONTRIBUTION_STAGES = [
   { key: "FINALIZED", label: "Finalized", hint: "Units allocated. This record can no longer change." },
 ];
 
-export const MAX_PROOF_BYTES = 2 * 1024 * 1024;
-export const PROOF_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
+type Can = ReturnType<typeof useCan>;
+type Proof = ContributionDetailDto["proofs"][number];
 
-/** Reads a file as base64 (no data: prefix). */
-export function readFileBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error("The file could not be read."));
-    reader.onload = () => resolve(String(reader.result).replace(/^data:[^;]*;base64,/, ""));
-    reader.readAsDataURL(file);
-  });
-}
-
-/** Client-side pre-check only; the server verifies the real file type and size. */
-export function proofFileProblem(file: File | null): string | null {
-  if (!file) return null;
-  if (file.size > MAX_PROOF_BYTES) return "The file is larger than 2 MB.";
-  if (!PROOF_ACCEPT.split(",").includes(file.type)) return "Upload a PNG, JPEG or WebP screenshot, or a PDF.";
-  return null;
-}
-
-/** The lifecycle steps this viewer may take on this contribution now. */
-export function contributionActions(
-  d: ContributionDetailDto,
-  can: (p: Parameters<ReturnType<typeof useCan>>[0]) => boolean,
-  userId: number
-): WorkflowAction[] {
+/** The lifecycle steps this viewer may take on this contribution now. The first primary one is the next step. */
+export function contributionActions(d: ContributionDetailDto, can: Can, userId: number): WorkflowAction[] {
   const c = d.contribution;
   const own = c.member_id === userId;
-  const selfNote = own ? " You are approving your own contribution: this is allowed only for the pool's sole administrator and is recorded in the audit trail as self-confirmed." : "";
+  const selfNote = own
+    ? " This is your own contribution: allowed only for the pool's sole administrator, and recorded in the audit trail as self-confirmed."
+    : "";
+  const note = { label: "Review note", min: 0, optional: true };
   const actions: WorkflowAction[] = [];
   if (c.status === "PENDING" && can("contributions:approve")) {
-    actions.push({ key: "approve", label: "Approve", title: "Approve this contribution?", consequences: `Approval does not allocate units. Next, confirm the money has arrived in the pool's bank account.${selfNote}`, success: "Contribution approved." });
-    actions.push({ key: "reject", label: "Reject", title: "Reject this contribution?", variant: "danger", consequences: "The request is closed. No units are allocated.", reason: { label: "Reason", min: 3 }, success: "Contribution rejected." });
+    actions.push({ key: "approve", label: "Approve", title: "Approve this contribution?", consequences: `Approval does not allocate units. Next, confirm the money has arrived in the pool's bank account.${selfNote}`, reason: note, success: "Contribution approved." });
   }
   if (c.status === "APPROVED" && can("contributions:confirm_funds")) {
-    actions.push({ key: "confirm-funds", label: "Confirm funds", title: "Confirm the money arrived?", consequences: `Check the bank statement first. This fixes the NAV date: the next end-of-day NAV after this moment (by the pool's cutoff time). Units are allocated when that NAV is struck.${selfNote}`, success: "Funds confirmed; waiting for the NAV." });
-    actions.push({ key: "reject", label: "Reject", title: "Reject this contribution?", variant: "danger", consequences: "The request is closed. No units are allocated.", reason: { label: "Reason", min: 3 }, success: "Contribution rejected." });
+    actions.push({ key: "confirm-funds", label: "Confirm funds received", title: "Confirm the money arrived?", consequences: `Check the pool's bank statement first. This fixes the NAV date: the next end-of-day NAV after this moment (by the pool's cutoff time). Units are allocated when that NAV is struck.${selfNote}`, reason: note, success: "Funds confirmed; waiting for the NAV." });
   }
   if (c.status === "AWAITING_NAV" && d.awaiting?.navOfficial && can("nav:finalize")) {
     actions.push({ key: "finalize", label: "Allocate units now", title: "Finalize at the official NAV?", consequences: `Units are allocated at the official NAV of ${d.awaiting.navDate}. This cannot be undone.`, success: "Units allocated." });
+  }
+  if ((c.status === "PENDING" || c.status === "APPROVED") && can("contributions:approve")) {
+    actions.push({ key: "reject", label: "Reject", title: "Reject this contribution?", variant: "danger", consequences: "The request is closed. No units are allocated. The contributor sees the reason.", reason: { label: "Reason", min: 3 }, success: "Contribution rejected." });
   }
   const ownPending = own && c.status === "PENDING";
   if (ownPending || (["PENDING", "APPROVED", "AWAITING_NAV"].includes(c.status) && can("contributions:approve"))) {
@@ -82,115 +67,257 @@ export function contributionActions(
   return actions;
 }
 
-function AddProof({ contributionId, onDone }: { contributionId: number; onDone: () => void }) {
+/** One sentence: what happens next, and who does it. */
+export function nextStep(d: ContributionDetailDto, can: Can, userId: number): string {
+  const c = d.contribution;
+  const admin = can("contributions:approve");
+  switch (c.status) {
+    case "PENDING":
+      return admin
+        ? "Review the payment details and payment proof, then approve or reject."
+        : c.member_id === userId
+          ? "Waiting for an administrator to review your payment."
+          : "Waiting for an administrator to review this payment.";
+    case "APPROVED":
+      return admin
+        ? "Check the pool's bank statement. When the money is there, confirm funds received (attach received proof if useful)."
+        : "Approved. Waiting for the administrator to confirm the money arrived in the pool's account.";
+    case "AWAITING_NAV":
+      return d.awaiting?.navOfficial
+        ? `The NAV for ${d.awaiting.navDate} is official: units can be allocated now.`
+        : `Funds confirmed. Units are allocated when the official NAV for ${d.awaiting?.navDate ?? "the next trading day"} is struck.`;
+    case "FINALIZED":
+      return "Finalized: units were allocated at the official NAV. This record no longer changes.";
+    case "REJECTED":
+      return "Rejected. No units were allocated.";
+    default:
+      return "Cancelled. No units were allocated.";
+  }
+}
+
+function Section({ title, description, children, icon }: { title: string; description?: string; children: React.ReactNode; icon?: React.ReactNode }) {
+  return (
+    <section className="border-t border-[var(--qf-line)] px-5 py-5 first:border-t-0">
+      <h3 className="flex items-center gap-2 font-display text-[16px] font-semibold text-[var(--qf-ink)]">
+        {icon}
+        {title}
+      </h3>
+      {description && <p className="mt-0.5 text-[12.5px] text-[var(--qf-ink-soft)]">{description}</p>}
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function Facts({ items }: { items: ReadonlyArray<{ label: string; value: React.ReactNode }> }) {
+  return (
+    <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+      {items.map((i) => (
+        <div key={i.label} className="min-w-0">
+          <dt className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--qf-ink-soft)]">{i.label}</dt>
+          <dd className="mt-0.5 break-words text-[14px] text-[var(--qf-ink)]">{i.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function ProofList({ proofs, url, empty }: { proofs: Proof[]; url: (id: number) => string; empty: string }) {
+  if (proofs.length === 0) return <p className="text-[13.5px] text-[var(--qf-ink-soft)]">{empty}</p>;
+  return (
+    <ul className="grid gap-3 sm:grid-cols-2">
+      {proofs.map((p) => (
+        <li key={p.id} className="flex gap-3 rounded-lg border border-[var(--qf-line)] p-2.5">
+          <a href={url(p.id)} target="_blank" rel="noopener noreferrer" className="shrink-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]" aria-label={`Open ${p.fileName}`}>
+            {p.contentType === "application/pdf" ? (
+              <span className="inline-flex h-16 w-16 items-center justify-center rounded bg-[var(--qf-cream-1)]">
+                <FileText size={22} aria-hidden="true" />
+              </span>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element -- private, authenticated file; not for next/image optimisation
+              <img src={url(p.id)} alt="" className="h-16 w-16 rounded bg-[var(--qf-cream-1)] object-cover" />
+            )}
+          </a>
+          <div className="min-w-0 text-[12.5px]">
+            <p className="truncate text-[13.5px] font-semibold" title={p.fileName}>{p.fileName}</p>
+            <p className="text-[var(--qf-ink-soft)]">
+              {formatBytes(p.sizeBytes)} · {p.uploaderName ?? "Unknown"}
+            </p>
+            <p className="text-[var(--qf-ink-soft)]">{formatTimestampIst(p.createdAt)}</p>
+            <p className="mt-1 flex gap-3">
+              <a href={url(p.id)} target="_blank" rel="noopener noreferrer" className="underline">Open</a>
+              <a href={`${url(p.id)}?download=1`} className="underline">Download</a>
+            </p>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function AttachProof({ contributionId, kind, label, hint, onDone }: { contributionId: number; kind: "PAYMENT" | "RECEIVED"; label: string; hint: string; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const problem = proofFileProblem(file);
   return (
-    <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-      <FormField label="Add payment proof" hint="PNG, JPEG, WebP or PDF, up to 2 MB." error={error ?? problem}>
-        {(p) => <input {...p} type="file" accept={PROOF_ACCEPT} className={inputClass} onChange={(e) => { setFile(e.target.files?.[0] ?? null); setError(null); }} />}
-      </FormField>
-      <button
-        type="button"
-        className={btnSecondary}
-        disabled={!file || problem !== null || pending}
-        onClick={async () => {
-          if (!file) return;
-          try {
-            await run(`contributions/${contributionId}/proofs`, { fileName: file.name, dataBase64: await readFileBase64(file) });
-            notify("success", "Proof attached.");
-            setFile(null);
-            onDone();
-          } catch (err) {
-            setError(errorMessage(err));
-          }
-        }}
-      >
-        <Paperclip size={15} aria-hidden="true" /> {pending ? "Uploading…" : "Attach"}
-      </button>
+    <div className="mt-4 space-y-2">
+      <ProofDropzone label={label} hint={hint} file={file} onChange={(f) => { setFile(f); setError(null); }} error={error} disabled={pending} />
+      {file && (
+        <button
+          type="button"
+          className={btnSecondary}
+          disabled={proofFileProblem(file) !== null || pending}
+          onClick={async () => {
+            try {
+              await run(`contributions/${contributionId}/proofs`, { fileName: file.name, dataBase64: await readFileBase64(file), kind });
+              notify("success", kind === "PAYMENT" ? "Payment proof attached." : "Received proof attached.");
+              setFile(null);
+              onDone();
+            } catch (err) {
+              setError(errorMessage(err));
+            }
+          }}
+        >
+          <Paperclip size={15} aria-hidden="true" /> {pending ? "Uploading…" : "Attach file"}
+        </button>
+      )}
     </div>
   );
 }
 
+/** Review history from the audit trail: who did what, with notes and reasons. */
+function History({ audit }: { audit: NonNullable<ContributionDetailDto["audit"]> }) {
+  return (
+    <ol className="space-y-3">
+      {audit.map((a) => (
+        <li key={a.id} className="flex gap-3 text-[13px]">
+          <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-[var(--qf-brass)]/70" />
+          <div className="min-w-0">
+            <p>
+              <span className="font-semibold">{humanize(a.action.replace(/^contribution\./, ""))}</span>
+              <span className="text-[var(--qf-ink-soft)]"> · {a.actorName ?? "System"} · {formatTimestampIst(a.createdAt)}</span>
+            </p>
+            {a.reason && <p className="mt-0.5 text-[var(--qf-ink-soft)]">“{a.reason}”</p>}
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** The record body (no actions). */
 export function ContributionReview({ d, onDone }: { d: ContributionDetailDto; onDone: () => void }) {
   const can = useCan();
   const { poolId, userId } = useFund();
   const c = d.contribution;
-  const canAddProof = ["PENDING", "APPROVED", "AWAITING_NAV"].includes(c.status) && (c.member_id === userId || can("contributions:create_for_member"));
-  const proofUrl = (proofId: number) => poolApi(poolId, `contributions/${c.id}/proofs/${proofId}`);
+  const isContributor = c.member_id === userId;
+  const recordedForMember = c.created_by === userId && can("contributions:create_for_member");
+  const privileged = can("contributions:view_all");
+  const url = (id: number) => poolApi(poolId, `contributions/${c.id}/proofs/${id}`);
+  const payment = d.proofs.filter((p) => p.kind === "PAYMENT");
+  const received = d.proofs.filter((p) => p.kind === "RECEIVED");
+  const canAddPayment = (isContributor || recordedForMember) && (c.status === "PENDING" || c.status === "APPROVED");
+  const canAddReceived = privileged && !["REJECTED", "CANCELLED"].includes(c.status);
+  const terminal = ["REJECTED", "CANCELLED"].includes(c.status);
 
   return (
-    <div className="space-y-6">
-      <SectionCard title="Progress">
-        <StageTracker stages={CONTRIBUTION_STAGES} status={c.status} />
-        {d.awaiting && (
-          <p className="mt-3 text-[13.5px] text-[var(--qf-ink-soft)]">
-            Units will be allocated at the official NAV of <DateDisplay value={d.awaiting.navDate} />
-            {d.awaiting.navOfficial ? " (struck)." : " (not struck yet)."}
-          </p>
-        )}
-      </SectionCard>
-      <SectionCard title="Payment details">
-        <DetailGrid
+    <div>
+      <div className="px-5 pb-5 pt-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[12.5px] text-[var(--qf-ink-soft)]">
+              {d.memberName} · {c.payment_method ? PAYMENT_METHOD_LABEL[c.payment_method] : "Method not given"} · paid <DateDisplay value={c.payment_date} />
+            </p>
+            <p className="mt-0.5 font-display text-[30px] font-semibold leading-tight tracking-tight">
+              <MoneyDisplay value={c.amount} />
+            </p>
+          </div>
+          <StatusBadge status={c.status} />
+        </div>
+        <p className={`mt-4 flex items-start gap-2 rounded-lg border px-3 py-2.5 text-[13.5px] ${terminal ? "border-[var(--qf-line)] bg-[var(--qf-cream-1)]" : "border-[var(--qf-brass)]/50 bg-[var(--qf-brass)]/10"}`}>
+          <ArrowRight size={16} className="mt-0.5 shrink-0 text-[var(--qf-brass-dark)]" aria-hidden="true" />
+          <span>
+            <span className="font-semibold">Next: </span>
+            {nextStep(d, can, userId)}
+          </span>
+        </p>
+        <div className="mt-5">
+          <StepIndicator stages={CONTRIBUTION_STAGES} status={c.status} />
+        </div>
+      </div>
+
+      <Section title="Payment details">
+        <Facts
           items={[
             { label: "Member", value: d.memberName },
-            { label: "Amount", value: <MoneyDisplay value={c.amount} /> },
-            { label: "Status", value: <StatusBadge status={c.status} /> },
             { label: "Payment method", value: c.payment_method ? PAYMENT_METHOD_LABEL[c.payment_method] : "—" },
-            { label: "UTR / reference", value: c.utr ?? "—" },
+            { label: "UTR / reference", value: c.utr ? <span className="font-mono text-[13px]">{c.utr}</span> : "—" },
             { label: "Payment date", value: <DateDisplay value={c.payment_date} /> },
-            { label: "Notes", value: c.notes ?? "—" },
-            { label: "Recorded", value: <DateDisplay value={c.created_at} /> },
+            { label: "Recorded", value: formatTimestampIst(c.created_at) },
           ]}
         />
-        <div className="mt-5">
-          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Payment proof</h3>
-          {d.proofs.length === 0 ? (
-            <p className="mt-2 text-[13.5px] text-[var(--qf-ink-soft)]">No proof attached.</p>
-          ) : (
-            <ul className="mt-2 grid gap-3 sm:grid-cols-2">
-              {d.proofs.map((p) => (
-                <li key={p.id} className="rounded-md border border-[var(--qf-line)] p-2">
-                  <a href={proofUrl(p.id)} target="_blank" rel="noopener noreferrer" className="block">
-                    {p.contentType === "application/pdf" ? (
-                      <span className="flex h-28 items-center justify-center gap-2 rounded bg-[var(--qf-cream-1)] text-[13px]">
-                        <FileText size={18} aria-hidden="true" /> PDF
-                      </span>
-                    ) : (
-                      // eslint-disable-next-line @next/next/no-img-element -- private, authenticated file; not for next/image optimisation
-                      <img src={proofUrl(p.id)} alt={`Payment proof: ${p.fileName}`} className="h-28 w-full rounded object-contain bg-[var(--qf-cream-1)]" />
-                    )}
-                  </a>
-                  <p className="mt-1.5 truncate text-[12.5px]" title={p.fileName}>{p.fileName}</p>
-                  <p className="text-[11.5px] text-[var(--qf-ink-soft)]">
-                    {Math.ceil(p.sizeBytes / 1024)} KB · {p.uploaderName ?? "member"} · <DateDisplay value={p.createdAt} /> ·{" "}
-                    <a href={`${proofUrl(p.id)}?download=1`} className="underline">Download</a>
-                  </p>
-                </li>
-              ))}
-            </ul>
+        {c.notes && (
+          <div className="mt-3">
+            <p className="text-[10.5px] font-semibold uppercase tracking-[0.1em] text-[var(--qf-ink-soft)]">Contributor&apos;s note</p>
+            <p className="mt-0.5 whitespace-pre-line text-[14px]">{c.notes}</p>
+          </div>
+        )}
+      </Section>
+
+      <Section title="Payment proof" description="From the contributor: their evidence of the payment.">
+        <ProofList proofs={payment} url={url} empty={isContributor ? "You have not attached payment proof." : "The contributor did not attach payment proof."} />
+        {canAddPayment && (
+          <AttachProof contributionId={c.id} kind="PAYMENT" label="Add payment proof" hint="A screenshot or PDF of your payment. It can be added until funds are confirmed." onDone={onDone} />
+        )}
+      </Section>
+
+      {(privileged || received.length > 0) && (
+        <Section
+          title="Received / verified proof"
+          description="From the administrator or manager: evidence that the money arrived, checked against the pool's bank statement."
+          icon={<ShieldCheck size={16} className="text-[var(--qf-up)]" aria-hidden="true" />}
+        >
+          <ProofList proofs={received} url={url} empty="No received proof attached." />
+          {canAddReceived && (
+            <AttachProof contributionId={c.id} kind="RECEIVED" label="Attach received proof" hint="Optional. For example a screenshot of the bank statement line showing the credit." onDone={onDone} />
           )}
-          {canAddProof && <AddProof contributionId={c.id} onDone={onDone} />}
-        </div>
-      </SectionCard>
+        </Section>
+      )}
+
       {(c.status === "AWAITING_NAV" || c.status === "FINALIZED") && (
-        <SectionCard title="Allocation">
-          <DetailGrid
+        <Section title="Allocation">
+          <Facts
             items={[
-              { label: "Funds confirmed", value: <DateDisplay value={c.funds_confirmed_at} /> },
-              { label: "NAV date", value: <DateDisplay value={c.effective_date} /> },
+              { label: "Funds confirmed", value: c.funds_confirmed_at ? formatTimestampIst(c.funds_confirmed_at) : "—" },
+              { label: "NAV date", value: <DateDisplay value={c.effective_date ?? d.awaiting?.navDate} /> },
               { label: "NAV used", value: <MoneyDisplay value={c.nav_used} dp={4} /> },
               { label: "Units allocated", value: <QuantityDisplay value={c.units_allocated} /> },
-              { label: "Rounding residual (kept by pool)", value: c.residual ? `₹${c.residual}` : "—" },
-              { label: "Finalized", value: <DateDisplay value={c.finalized_at} /> },
+              { label: "Residual (kept by pool)", value: c.residual ? `₹${c.residual}` : "—" },
+              { label: "Finalized", value: c.finalized_at ? formatTimestampIst(c.finalized_at) : "—" },
             ]}
           />
-        </SectionCard>
+        </Section>
       )}
-      <ActionPanel path={`contributions/${c.id}`} actions={contributionActions(d, can, userId)} onDone={onDone} />
+
+      {d.audit && d.audit.length > 0 && (
+        <Section title="Review notes and history" description="From the audit trail. Notes entered when approving or confirming appear here.">
+          <History audit={d.audit} />
+        </Section>
+      )}
     </div>
+  );
+}
+
+/** The actions for this viewer, as a button row (drawer footer / page header). */
+export function ContributionReviewActions({ d, onDone }: { d: ContributionDetailDto; onDone: () => void }) {
+  const can = useCan();
+  const { userId } = useFund();
+  return (
+    <ActionBar
+      path={`contributions/${d.contribution.id}`}
+      actions={contributionActions(d, can, userId)}
+      onDone={onDone}
+      empty={<p className="text-[13px] text-[var(--qf-ink-soft)]">No actions for you on this contribution right now.</p>}
+    />
   );
 }

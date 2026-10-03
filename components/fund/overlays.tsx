@@ -16,18 +16,28 @@ type ModalProps = {
   children: React.ReactNode;
   /** "center" (default) or a side sheet. */
   placement?: "center" | "left" | "right";
+  /** Wider panel (review workflows). */
+  size?: "default" | "wide";
+  /** Pinned below the scrolling body (primary actions stay visible). */
+  footer?: React.ReactNode;
 };
 
 const SHELL =
   "border border-[var(--qf-line)] bg-[var(--qf-cream-0)] p-0 text-[var(--qf-ink)] shadow-lg backdrop:bg-black/40";
 
 const PLACEMENT: Record<NonNullable<ModalProps["placement"]>, string> = {
-  center: "m-auto w-[calc(100%-1.5rem)] max-w-lg rounded-lg",
-  left: "m-0 mr-auto h-dvh max-h-none w-[86%] max-w-sm rounded-none",
-  right: "m-0 ml-auto h-dvh max-h-none w-full max-w-md rounded-none",
+  center: "m-auto w-[calc(100%-1.5rem)] rounded-lg",
+  left: "m-0 mr-auto h-dvh max-h-none w-[86%] rounded-none",
+  right: "m-0 ml-auto h-dvh max-h-none w-full rounded-none",
 };
 
-export function Modal({ open, onClose, title, description, children, placement = "center" }: ModalProps) {
+const WIDTH: Record<NonNullable<ModalProps["placement"]>, Record<NonNullable<ModalProps["size"]>, string>> = {
+  center: { default: "max-w-lg", wide: "max-w-2xl" },
+  left: { default: "max-w-sm", wide: "max-w-2xl" },
+  right: { default: "max-w-md", wide: "max-w-2xl" },
+};
+
+export function Modal({ open, onClose, title, description, children, placement = "center", size = "default", footer }: ModalProps) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
 
@@ -50,11 +60,11 @@ export function Modal({ open, onClose, title, description, children, placement =
         // A click on the <dialog> itself (not its content) is a backdrop click.
         if (e.target === ref.current) onClose();
       }}
-      className={`${SHELL} ${PLACEMENT[placement]}`}
+      className={`${SHELL} ${PLACEMENT[placement]} ${WIDTH[placement][size]}`}
     >
       {open && (
-        <div className="flex max-h-[90dvh] flex-col">
-          <div className="flex items-start justify-between gap-3 border-b border-[var(--qf-line)] px-5 py-4">
+        <div className={`flex flex-col ${placement === "center" ? "max-h-[90dvh]" : "h-full"}`}>
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--qf-line)] px-5 py-4">
             <div className="min-w-0">
               <h2 id={titleId} className="font-display text-lg font-semibold">
                 {title}
@@ -65,12 +75,13 @@ export function Modal({ open, onClose, title, description, children, placement =
               type="button"
               onClick={onClose}
               aria-label="Close"
-              className="-mr-1 rounded p-1.5 text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]"
+              className="-mr-2 -mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-md text-[var(--qf-ink-soft)] hover:bg-[var(--qf-cream-1)] hover:text-[var(--qf-ink)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]"
             >
               <X size={16} />
             </button>
           </div>
-          <div className="overflow-y-auto">{children}</div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{children}</div>
+          {footer && <div className="shrink-0 border-t border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-5 py-3">{footer}</div>}
         </div>
       )}
     </dialog>
@@ -122,7 +133,7 @@ export function FormDialog({
             {error}
           </p>
         )}
-        <div className="flex flex-col-reverse gap-2 border-t border-[var(--qf-line)] px-5 py-3 sm:flex-row sm:justify-end">
+        <div className="sticky bottom-0 flex flex-col-reverse gap-2 border-t border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-5 py-3 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} disabled={pending} className={btnSecondary}>
             Cancel
           </button>

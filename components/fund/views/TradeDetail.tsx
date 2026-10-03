@@ -6,12 +6,12 @@ import { Pencil } from "lucide-react";
 import { errorMessage, type InstrumentDto, type TradeDetailDto } from "@/components/fund/api";
 import { isPositiveDecimal, resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
-import { formatMoney, humanize } from "@/components/fund/format";
+import { formatCalendarDate, formatMoney, humanize } from "@/components/fund/format";
 import { poolBase } from "@/components/fund/nav";
 import { DecimalField, SelectField, TextAreaField, TextField } from "@/components/fund/forms";
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog } from "@/components/fund/overlays";
-import { PageHeader, SectionCard, btnSecondary } from "@/components/fund/parts";
+import { PageHeader, SectionCard, btnPrimary } from "@/components/fund/parts";
 import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
@@ -66,7 +66,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
       open={open}
       onClose={onClose}
       title={`Edit trade #${t.id}`}
-      description="Correct an executed trade to match the contract note. The previous values are kept in the trade's revision history and the audit trail. Positions, cash and P&L are recalculated from the corrected history; cash differences are posted as dated adjustment entries, never by editing the ledger."
+      description="Match the contract note. Previous values stay in the revision history and audit trail; positions, cash and P&L are recalculated."
       submitLabel="Save correction"
       pending={pending}
       error={error}
@@ -190,7 +190,7 @@ function Revisions({ revisions }: { revisions: TradeDetailDto["revisions"] }) {
   );
 }
 
-export function TradeDetail({ id }: { id: string }) {
+export function TradeDetail({ id, initialEdit = false }: { id: string; initialEdit?: boolean }) {
   const can = useCan();
   const { poolId } = useFund();
   const valid = /^\d{1,9}$/.test(id);
@@ -198,7 +198,7 @@ export function TradeDetail({ id }: { id: string }) {
   const state = valid ? resourceState(res, "the trade") : null;
   const d = res.data;
   const t = d?.trade;
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState(initialEdit);
   const canEdit = t !== undefined && ["EXECUTED", "SETTLED", "FINALIZED"].includes(t.status) && can("trades:correct");
 
   const actions: WorkflowAction[] = [];
@@ -227,17 +227,15 @@ export function TradeDetail({ id }: { id: string }) {
   return (
     <>
       <PageHeader
-        eyebrow="Trade"
+        eyebrow={<Link href={`${poolBase(poolId)}/trades`} className="underline-offset-2 hover:underline">← Trades</Link>}
         title={t ? `Trade #${t.id} · ${t.symbol}` : "Trade"}
+        description={t ? `${PRODUCT_LABEL[t.product]} · ${ACTION_LABEL[t.position_action]} · ${formatCalendarDate(t.trade_date)}` : undefined}
         actions={
-          <>
-            {canEdit && (
-              <button type="button" className={btnSecondary} onClick={() => setEditing(true)}>
-                <Pencil size={15} aria-hidden="true" /> Edit trade
-              </button>
-            )}
-            <Link href={`${poolBase(poolId)}/trades`} className="text-[13px] underline">Back to trades</Link>
-          </>
+          canEdit ? (
+            <button type="button" className={btnPrimary} onClick={() => setEditing(true)}>
+              <Pencil size={15} aria-hidden="true" /> Edit trade
+            </button>
+          ) : undefined
         }
       />
       {state ? (

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useId, useState } from "react";
-import { ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search, SlidersHorizontal } from "lucide-react";
 import { btnSecondary } from "@/components/fund/parts";
 import { inputClass } from "@/components/fund/forms";
 
@@ -181,14 +181,36 @@ export function FilterBar({
   onReset?: () => void;
   dirty?: boolean;
 }) {
+  // Phones: collapsed behind a "Filters" toggle so the list is reachable
+  // without scrolling past every control. Wider screens: always open.
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
   return (
-    <div role="search" className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-[var(--qf-line)] bg-[var(--qf-cream-1)]/50 p-3 sm:p-4">
-      {children}
-      {onReset && dirty && (
-        <button type="button" onClick={onReset} className={btnSecondary}>
-          Clear filters
-        </button>
-      )}
+    <div role="search" className="mb-4">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((o) => !o)}
+        className={`${btnSecondary} w-full justify-between sm:hidden`}
+      >
+        <span className="inline-flex items-center gap-2">
+          <SlidersHorizontal size={15} aria-hidden="true" /> Filters
+          {dirty && <span className="rounded-full bg-[var(--qf-brass)]/20 px-2 py-0.5 text-[11px] text-[var(--qf-brass-dark)]">On</span>}
+        </span>
+        <ChevronDown size={16} aria-hidden="true" className={`transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      <div
+        id={panelId}
+        className={`${open ? "mt-2 flex" : "hidden"} flex-wrap items-end gap-3 rounded-xl border border-[var(--qf-line)] bg-[var(--qf-cream-1)]/50 p-3 sm:mt-0 sm:flex sm:p-4`}
+      >
+        {children}
+        {onReset && dirty && (
+          <button type="button" onClick={onReset} className={btnSecondary}>
+            Clear filters
+          </button>
+        )}
+      </div>
     </div>
   );
 }
