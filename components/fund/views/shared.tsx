@@ -67,7 +67,7 @@ export function InstrumentPicker({
   }
 
   return (
-    <FormField label="Instrument" required error={error ?? failed} hint="Search by NSE/BSE symbol or name.">
+    <FormField label="Instrument" required error={error ?? failed} hint="Search by NSE/BSE symbol, company name or ISIN.">
       {(p) => (
         <div className="space-y-2">
           <div className="flex gap-2">
@@ -99,6 +99,7 @@ export function InstrumentPicker({
                   <li key={i.id}>
                     <button type="button" onClick={() => onChange(i)} className="block w-full px-3 py-2 text-left text-[13.5px] hover:bg-[var(--qf-cream-1)]">
                       <strong>{i.symbol}</strong> &middot; {i.exchange}
+                      {i.series && i.series !== "EQ" ? <span className="text-[var(--qf-ink-soft)]"> &middot; {i.series}</span> : null}
                       {i.name ? <span className="text-[var(--qf-ink-soft)]"> &middot; {i.name}</span> : null}
                     </button>
                   </li>

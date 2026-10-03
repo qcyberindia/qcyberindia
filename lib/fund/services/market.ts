@@ -21,7 +21,18 @@ import { getMarketDataProvider, type Exchange, type Quote } from "@/lib/market-d
 
 export const EXCHANGES: readonly Exchange[] = ["NSE", "BSE"];
 
-export type Instrument = { id: number; symbol: string; exchange: Exchange; name: string | null };
+/**
+ * isin/series come from the exchange master import (migration 011,
+ * scripts/import-nse-equity.ts); hand-added instruments may lack them.
+ */
+export type Instrument = {
+  id: number;
+  symbol: string;
+  exchange: Exchange;
+  name: string | null;
+  isin?: string | null;
+  series?: string | null;
+};
 
 /** NSE/BSE trading symbols: upper-case letters, digits and & - . _ (e.g. M&M, BAJAJ-AUTO). */
 export function normalizeSymbol(raw: string): string {
@@ -40,15 +51,21 @@ export async function listInstruments(
   db: Db,
   opts: { q: string | null; exchange: Exchange | null; ids?: number[] | null; limit: number }
 ): Promise<Instrument[]> {
-  const q = opts.q ? `%${escapeLike(opts.q.trim())}%` : null;
+  const term = opts.q?.trim() ? opts.q.trim() : null;
+  const q = term ? `%${escapeLike(term)}%` : null;
+  // With ~2.6k master rows a broad term ("IND") matches many, so exact
+  // symbol/ISIN hits rank first, then symbol prefixes, then name matches.
   const { rows } = await db.query<Instrument>(
-    `SELECT id, symbol, exchange, name FROM qfinera_fund_instruments
-      WHERE ($1::text IS NULL OR symbol ILIKE $1 OR name ILIKE $1)
+    `SELECT id, symbol, exchange, name, isin, series FROM qfinera_fund_instruments
+      WHERE ($1::text IS NULL OR symbol ILIKE $1 OR name ILIKE $1 OR isin = upper($5))
         AND ($2::text IS NULL OR exchange = $2)
         AND ($3::int[] IS NULL OR id = ANY($3::int[]))
-      ORDER BY symbol, exchange
+      ORDER BY CASE WHEN upper(symbol) = upper($5) OR isin = upper($5) THEN 0
+                    WHEN symbol ILIKE $6 THEN 1
+                    ELSE 2 END,
+               symbol, exchange
       LIMIT $4`,
-    [q, opts.exchange, opts.ids ?? null, opts.limit]
+    [q, opts.exchange, opts.ids ?? null, opts.limit, term, term ? `${escapeLike(term)}%` : null]
   );
   return rows;
 }
