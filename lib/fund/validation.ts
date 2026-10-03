@@ -12,9 +12,9 @@ const MAX_BODY_BYTES = 64 * 1024;
 
 export type JsonObject = Record<string, unknown>;
 
-export async function readJsonObject(req: Request): Promise<JsonObject> {
+export async function readJsonObject(req: Request, maxBytes: number = MAX_BODY_BYTES): Promise<JsonObject> {
   const text = await req.text();
-  if (text.length > MAX_BODY_BYTES) throw validationError("Request body is too large.");
+  if (text.length > maxBytes) throw validationError("Request body is too large.");
   let parsed: unknown;
   try {
     parsed = text ? JSON.parse(text) : {};

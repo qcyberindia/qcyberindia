@@ -23,13 +23,8 @@ import {
   todayIstInput,
 } from "@/components/fund/views/shared";
 
-const CHARGES = [
-  ["brokerage", "Brokerage"],
-  ["stt", "STT"],
-  ["gst", "GST"],
-  ["stampDuty", "Stamp duty"],
-  ["otherCharges", "Other charges"],
-] as const;
+/** One total, entered by the manager. QFinera does not calculate broker-specific charges. */
+const CHARGES_HINT = "Your estimate, or the total from the contract note (brokerage, STT, exchange, GST, SEBI, stamp duty…). QFinera does not calculate broker charges.";
 
 type Segment = "EQUITY" | "FUTURE" | "OPTION";
 type Product = "EQUITY_DELIVERY" | "EQUITY_INTRADAY" | "FUTURES" | "OPTIONS";
@@ -113,7 +108,7 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   const [tradeDate, setTradeDate] = useState(todayIstInput());
   const [quantity, setQuantity] = useState("");
   const [price, setPrice] = useState("");
-  const [charges, setCharges] = useState<Record<string, string>>({});
+  const [estimatedCharges, setEstimatedCharges] = useState("");
   const [externalRef, setExternalRef] = useState("");
   const [notes, setNotes] = useState("");
   const [execute, setExecute] = useState(true);
@@ -125,8 +120,9 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   const product = productFor(segment, equityProduct);
   const longOnly = product === "EQUITY_DELIVERY";
   const side = ACTIONS.find((a) => a.value === action)!.side;
-  const chargeBody = Object.fromEntries(CHARGES.map(([k]) => [k, charges[k] || "0"]));
-  const ticketReady = instrument !== null && isPositiveDecimal(quantity, 4) && isPositiveDecimal(price, 4) && CHARGES.every(([k]) => !charges[k] || isPositiveDecimal(charges[k], 2) || /^0+(\.0+)?$/.test(charges[k]));
+  const chargeBody = { estimatedCharges: estimatedCharges.trim() || "0" };
+  const chargesOk = !estimatedCharges.trim() || isPositiveDecimal(estimatedCharges.trim(), 2) || /^0+(\.0+)?$/.test(estimatedCharges.trim());
+  const ticketReady = instrument !== null && isPositiveDecimal(quantity, 4) && isPositiveDecimal(price, 4) && chargesOk;
   const previewKey = ticketReady ? JSON.stringify([instrument!.id, product, action, tradeDate, quantity, price, chargeBody]) : "";
 
   useEffect(() => {
@@ -233,12 +229,7 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
         <DecimalField label="Quantity" value={quantity} onChange={setQuantity} decimals={4} required hint={instrument?.lotSize && segment !== "EQUITY" ? `Units; lot size ${instrument.lotSize}.` : undefined} />
         <DecimalField label={segment === "OPTION" ? "Premium (₹)" : "Price (₹)"} value={price} onChange={setPrice} decimals={4} required />
       </div>
-      <fieldset className="grid gap-4 sm:grid-cols-3">
-        <legend className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Charges from the contract note (₹)</legend>
-        {CHARGES.map(([k, label]) => (
-          <DecimalField key={k} label={label} value={charges[k] ?? ""} onChange={(v) => setCharges((c) => ({ ...c, [k]: v }))} decimals={2} placeholder="0.00" />
-        ))}
-      </fieldset>
+      <DecimalField label="Estimated charges (₹)" value={estimatedCharges} onChange={setEstimatedCharges} decimals={2} placeholder="0.00" hint={CHARGES_HINT} />
       {previewKey && preview && <TicketPreview preview={preview} closing={action.startsWith("CLOSE")} />}
       <TextField label="Contract note / broker reference" value={externalRef} onChange={setExternalRef} maxLength={64} hint="Optional. Prevents the same trade being entered twice." />
       <TextAreaField label="Notes" value={notes} onChange={setNotes} maxLength={1000} rows={2} />

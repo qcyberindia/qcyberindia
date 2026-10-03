@@ -5,7 +5,7 @@ import { jsonOk } from "@/lib/fund/http";
 import { poolRoute, type PoolParams } from "@/lib/fund/pool-http";
 import { listContributions } from "@/lib/fund/queries";
 import { assertPermission } from "@/lib/fund/rbac";
-import { createContribution, type ContributionStatus } from "@/lib/fund/services/contributions";
+import { PAYMENT_METHODS, createContribution, type ContributionStatus } from "@/lib/fund/services/contributions";
 import { todayIst } from "@/lib/fund/services/types";
 import {
   parseDecimal,
@@ -47,6 +47,8 @@ export async function POST(req: NextRequest, { params }: PoolParams) {
         paymentDate,
         utr: parseOptionalText(body.utr, "utr", 64),
         paymentProofReference: parseOptionalText(body.paymentProofReference, "paymentProofReference", 200),
+        paymentMethod: body.paymentMethod === undefined || body.paymentMethod === null ? null : parseEnum(body.paymentMethod, "paymentMethod", PAYMENT_METHODS),
+        notes: parseOptionalText(body.notes, "notes", 1000),
       });
       return jsonOk({ contribution }, 201);
     },

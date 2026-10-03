@@ -4,10 +4,15 @@
 //
 //   create         member (or MANAGER/ADMIN on a member's behalf) records the transfer
 //   approve        ADMIN approves the request
-//   confirmFunds   ADMIN confirms the money was received -> AWAITING_NAV.
+//   confirmFunds   ADMIN confirms the money was received -> AWAITING_NAV
+//                  ("funds confirmed, awaiting NAV" is one state).
 //                  This timestamp (funds_confirmed_at) is the NAV cutoff event.
 //   finalize       when the applicable EOD NAV is official: allocate units,
 //                  post the ledger entry, update the member's units.
+//
+// Segregation of duties: an ADMIN may not approve or confirm their OWN
+// contribution while another active ADMIN exists. A sole ADMIN may; the
+// step is then audited as self-confirmed.
 //
 // Units are NEVER allocated at approval. The effective date is the date of
 // the NAV used. Residual (amount - units x NAV) belongs to the Fund.
@@ -24,6 +29,9 @@ import { assertActiveMember, assertFundActive, type NavSnapshotRef, type Service
 
 export type ContributionStatus = "PENDING" | "APPROVED" | "AWAITING_NAV" | "FINALIZED" | "REJECTED" | "CANCELLED";
 
+export const PAYMENT_METHODS = ["UPI", "IMPS", "NEFT", "RTGS", "BANK_TRANSFER", "CHEQUE", "CASH", "OTHER"] as const;
+export type PaymentMethod = (typeof PAYMENT_METHODS)[number];
+
 export type ContributionRecord = {
   id: number;
   fund_id: number;
@@ -32,6 +40,8 @@ export type ContributionRecord = {
   payment_date: string;
   utr: string | null;
   payment_proof_reference: string | null;
+  payment_method: PaymentMethod | null;
+  notes: string | null;
   status: ContributionStatus;
   nav_used: string | null;
   units_allocated: string | null;
@@ -49,7 +59,7 @@ export type ContributionRecord = {
 
 export const CONTRIBUTION_COLS = `
   id, fund_id, member_id, amount::text AS amount, payment_date::text AS payment_date, utr,
-  payment_proof_reference, status, nav_used::text AS nav_used, units_allocated::text AS units_allocated,
+  payment_proof_reference, payment_method, notes, status, nav_used::text AS nav_used, units_allocated::text AS units_allocated,
   residual::text AS residual, approved_by, approved_at, funds_confirmed_by, funds_confirmed_at,
   effective_date::text AS effective_date, nav_snapshot_id, finalized_at, created_by, created_at`;
 
@@ -58,6 +68,9 @@ function auditState(r: ContributionRecord): Record<string, unknown> {
     status: r.status,
     amount: r.amount,
     member_id: r.member_id,
+    payment_date: r.payment_date,
+    payment_method: r.payment_method,
+    utr: r.utr,
     nav_used: r.nav_used,
     units_allocated: r.units_allocated,
     residual: r.residual,
@@ -101,6 +114,8 @@ export async function createContribution(
     paymentDate: string;
     utr: string | null;
     paymentProofReference: string | null;
+    paymentMethod?: PaymentMethod | null;
+    notes?: string | null;
   }
 ): Promise<ContributionRecord> {
   const memberId = input.memberId ?? ctx.actor.userId;
@@ -122,8 +137,8 @@ export async function createContribution(
       const row = await one<ContributionRecord>(
         db,
         `INSERT INTO qfinera_fund_contributions
-           (fund_id, member_id, amount, payment_date, utr, payment_proof_reference, status, created_by)
-         VALUES ($1, $2, $3, $4::date, $5, $6, 'PENDING', $7)
+           (fund_id, member_id, amount, payment_date, utr, payment_proof_reference, status, created_by, payment_method, notes)
+         VALUES ($1, $2, $3, $4::date, $5, $6, 'PENDING', $7, $8, $9)
          RETURNING ${CONTRIBUTION_COLS}`,
         [
           ctx.fundId,
@@ -133,6 +148,8 @@ export async function createContribution(
           input.utr,
           input.paymentProofReference,
           ctx.actor.userId,
+          input.paymentMethod ?? null,
+          input.notes ?? null,
         ]
       );
       if (!row) throw new Error("contribution insert returned no row");
@@ -154,6 +171,26 @@ export async function createContribution(
   }
 }
 
+export const SELF_CONFIRMED = "Self-confirmed (sole administrator)";
+
+/**
+ * Returns true when the actor is acting on their own contribution as the
+ * pool's only active ADMIN (allowed, audited as self-confirmed). Refuses
+ * when another active ADMIN exists: they must take the step.
+ */
+async function selfConfirmation(db: Db, ctx: ServiceCtx, row: ContributionRecord, step: string): Promise<boolean> {
+  if (row.member_id !== ctx.actor.userId) return false;
+  const admins = await one<{ n: number }>(
+    db,
+    "SELECT COUNT(*)::int AS n FROM qfinera_fund_memberships WHERE fund_id = $1 AND role = 'ADMIN' AND status = 'active'",
+    [ctx.fundId]
+  );
+  if ((admins?.n ?? 0) > 1) {
+    throw conflictError(`You cannot ${step} your own contribution. Another administrator of this pool must do it.`);
+  }
+  return true;
+}
+
 export async function approveContribution(ctx: ServiceCtx, id: number): Promise<ContributionRecord> {
   assertPermission(ctx.actor, "contributions:approve");
   return inTransaction(async (db) => {
@@ -162,6 +199,7 @@ export async function approveContribution(ctx: ServiceCtx, id: number): Promise<
     if (before.status !== "PENDING") {
       throw conflictError(`Only a PENDING contribution can be approved (this one is ${before.status}).`);
     }
+    const self = await selfConfirmation(db, ctx, before, "approve");
     const after = await one<ContributionRecord>(
       db,
       `UPDATE qfinera_fund_contributions
@@ -174,11 +212,12 @@ export async function approveContribution(ctx: ServiceCtx, id: number): Promise<
     await writeAudit(db, {
       fundId: ctx.fundId,
       userId: ctx.actor.userId,
-      action: "contribution.approved",
+      action: self ? "contribution.self_approved" : "contribution.approved",
       entityType: "contribution",
       entityId: id,
       before: auditState(before),
-      after: auditState(after),
+      after: { ...auditState(after), self_confirmed: self },
+      reason: self ? SELF_CONFIRMED : null,
       meta: ctx.meta,
     });
     return after;
@@ -197,6 +236,7 @@ export async function confirmContributionFunds(
     if (before.status !== "APPROVED") {
       throw conflictError(`Funds can only be confirmed for an APPROVED contribution (this one is ${before.status}).`);
     }
+    const self = await selfConfirmation(db, ctx, before, "confirm funds for");
     const confirmed = await one<ContributionRecord>(
       db,
       `UPDATE qfinera_fund_contributions
@@ -220,11 +260,12 @@ export async function confirmContributionFunds(
     await writeAudit(db, {
       fundId: ctx.fundId,
       userId: ctx.actor.userId,
-      action: "contribution.funds_confirmed",
+      action: self ? "contribution.self_confirmed_funds" : "contribution.funds_confirmed",
       entityType: "contribution",
       entityId: id,
       before: auditState(before),
-      after: { ...auditState(after), applicable_nav_date: navDate },
+      after: { ...auditState(after), applicable_nav_date: navDate, self_confirmed: self },
+      reason: self ? SELF_CONFIRMED : null,
       meta: ctx.meta,
     });
     return { contribution: after, applicableNavDate: navDate };

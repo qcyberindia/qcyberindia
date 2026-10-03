@@ -35,6 +35,7 @@ import {
   invalidCombination,
   positionKey,
   replayBook,
+  replayCash,
   settlementOf,
   sideFor,
   emptyBookPosition,
@@ -50,7 +51,7 @@ import { inTransaction, lockFund, one, type Db } from "@/lib/fund/db";
 import { FundError, conflictError, notFoundError, validationError } from "@/lib/fund/errors";
 import { postLedgerEntry } from "@/lib/fund/ledger-store";
 import { assertPermission, hasPermission, type FundActor } from "@/lib/fund/rbac";
-import { assertCashNeverNegativeFrom, loadAccountingTrades, type AccountingTrade } from "@/lib/fund/state";
+import { assertCashNeverNegativeFrom, latestOfficialNavDate, loadAccountingTrades, type AccountingTrade } from "@/lib/fund/state";
 import {
   MIN_BACKDATE_REASON,
   accountingRule,
@@ -113,6 +114,8 @@ export type TradeRecord = {
   executed_at: Date | null;
   settled_at: Date | null;
   reversed_at: Date | null;
+  corrected_at: Date | null;
+  correction_count: number;
 };
 
 const TRADE_SELECT = `
@@ -123,7 +126,8 @@ const TRADE_SELECT = `
          t.quantity::text AS quantity, t.price::text AS price, t.brokerage::text AS brokerage, t.stt::text AS stt,
          t.gst::text AS gst, t.stamp_duty::text AS stamp_duty, t.other_charges::text AS other_charges,
          t.net_value::text AS net_value, t.status, t.external_ref, t.notes, t.is_backdated, t.backdated_reason,
-         t.reversal_reason, t.created_by, t.created_at, t.executed_at, t.settled_at, t.reversed_at
+         t.reversal_reason, t.created_by, t.created_at, t.executed_at, t.settled_at, t.reversed_at,
+         t.corrected_at, t.correction_count
     FROM qfinera_fund_trades t
     JOIN qfinera_fund_instruments i ON i.id = t.instrument_id`;
 
@@ -498,13 +502,18 @@ export async function reverseTrade(
     if (!EFFECTIVE_TRADE_STATUSES.includes(before.status)) {
       throw conflictError(`Only an executed or settled trade can be reversed (this one is ${before.status}).`);
     }
-    const posting = await one<{ cash_delta: string }>(
+    // Undo the trade's whole cash effect: its primary posting plus any
+    // correction adjustments posted against it.
+    const posting = await one<{ cash_delta: string; primaries: number }>(
       db,
-      `SELECT cash_delta::text AS cash_delta FROM qfinera_fund_ledger_entries
-        WHERE reference_table = 'qfinera_fund_trades' AND reference_id = $1 AND entry_type IN ('BUY', 'SELL', 'TRADE_MTM')`,
-      [id]
+      `SELECT COALESCE(SUM(cash_delta), 0)::text AS cash_delta,
+              COUNT(*) FILTER (WHERE entry_type IN ('BUY', 'SELL', 'TRADE_MTM'))::int AS primaries
+         FROM qfinera_fund_ledger_entries
+        WHERE fund_id = $2 AND reference_table = 'qfinera_fund_trades' AND reference_id = $1
+          AND entry_type IN ('BUY', 'SELL', 'TRADE_MTM', 'ADJUSTMENT')`,
+      [id, ctx.fundId]
     );
-    if (!posting) throw conflictError("This trade has no ledger posting to reverse.");
+    if (!posting || posting.primaries === 0) throw conflictError("This trade has no ledger posting to reverse.");
 
     const effective = todayIst(now);
     const backdate = await decideBackdate(db, ctx, effective, { reason: input.reason, confirmed: input.confirmed });
@@ -632,6 +641,259 @@ export async function previewTrade(
   }
 }
 
+// ------------------------------------------------------------ correction
+
+export type TradeCorrectionInput = {
+  instrumentId: number;
+  product: Product;
+  action: PositionAction;
+  side: TradeSide | null;
+  tradeDate: string;
+  settlementDate: string | null;
+  quantity: Money;
+  price: Money;
+  charges: CreateTradeInput["charges"];
+  externalRef: string | null;
+  notes: string | null;
+  reason: string;
+  /** Required when a cash adjustment falls on or before the latest official NAV. */
+  confirmed: boolean;
+};
+
+export type CashAdjustment = { tradeId: number; entryDate: string; cashDelta: string; isBackdated: boolean };
+
+export type TradeCorrectionResult = {
+  trade: TradeRecord;
+  revision: number;
+  adjustments: CashAdjustment[];
+  /** Official NAV dates on or after the earliest changed date: struck before this correction. */
+  affectedOfficialNavDates: string[];
+};
+
+/** The editable values of a trade, as stored (for revisions and audit). */
+function editableValues(t: TradeRecord): Record<string, unknown> {
+  return {
+    instrument_id: t.instrument_id,
+    instrument: `${t.symbol}:${t.exchange}`,
+    product: t.product,
+    position_action: t.position_action,
+    side: t.side,
+    trade_date: t.trade_date,
+    settlement_date: t.settlement_date,
+    quantity: t.quantity,
+    price: t.price,
+    charges: { brokerage: t.brokerage, stt: t.stt, gst: t.gst, stamp_duty: t.stamp_duty, other_charges: t.other_charges },
+    net_value: t.net_value,
+    external_ref: t.external_ref,
+    notes: t.notes,
+  };
+}
+
+/**
+ * Re-derives every executed trade's cash from the (corrected) history and
+ * posts a dated ADJUSTMENT for each difference against what the ledger
+ * already holds for that trade on that date. The ledger is never edited:
+ * the original postings stay, and the adjustments explain the change.
+ */
+async function reconcileTradeCash(db: Db, ctx: ServiceCtx, history: readonly AccountingTrade[], correctedId: number, reason: string, latestNav: string | null) {
+  const expected = accountingRule(() => replayCash(history));
+  const ids = [...expected.keys()];
+  const { rows } = await db.query<{ reference_id: number; entry_date: string; cash: string }>(
+    `SELECT reference_id, entry_date::text AS entry_date, SUM(cash_delta)::text AS cash
+       FROM qfinera_fund_ledger_entries
+      WHERE fund_id = $1 AND reference_table = 'qfinera_fund_trades' AND reference_id = ANY($2::int[])
+        AND entry_type IN ('BUY', 'SELL', 'TRADE_MTM', 'ADJUSTMENT')
+      GROUP BY reference_id, entry_date`,
+    [ctx.fundId, ids]
+  );
+  const actual = new Map<number, Map<string, Money>>();
+  for (const r of rows) {
+    const byDate = actual.get(r.reference_id) ?? new Map<string, Money>();
+    byDate.set(r.entry_date, m(r.cash));
+    actual.set(r.reference_id, byDate);
+  }
+
+  const adjustments: CashAdjustment[] = [];
+  for (const [tradeId, exp] of expected) {
+    const byDate = actual.get(tradeId) ?? new Map<string, Money>();
+    const dates = new Set([...byDate.keys(), exp.tradeDate]);
+    for (const date of [...dates].sort()) {
+      const want = date === exp.tradeDate ? exp.cashDelta : Money.zero();
+      const diff = want.subtract(byDate.get(date) ?? Money.zero());
+      if (diff.isZero()) continue;
+      const isBackdated = latestNav !== null && date <= latestNav;
+      await postLedgerEntry(db, {
+        fundId: ctx.fundId,
+        memberId: null,
+        entryType: "ADJUSTMENT",
+        referenceTable: "qfinera_fund_trades",
+        referenceId: tradeId,
+        entryDate: date,
+        cashDelta: diff,
+        unitsDelta: Money.zero(),
+        description:
+          tradeId === correctedId
+            ? `Correction of trade #${tradeId}`
+            : `Trade #${tradeId} cash re-derived after correction of trade #${correctedId}`,
+        isBackdated,
+        backdatedReason: isBackdated ? reason : null,
+        createdBy: ctx.actor.userId,
+      });
+      adjustments.push({ tradeId, entryDate: date, cashDelta: diff.toDecimalString(2), isBackdated });
+    }
+  }
+  return adjustments;
+}
+
+/**
+ * ADMIN corrects an executed trade. The trade row takes the corrected
+ * values; the previous values are preserved in an append-only revision row
+ * and in the audit log, with the reason. Positions, P&L and exposure follow
+ * automatically (they are replayed from trades); cash is re-derived for the
+ * whole history and differences are posted as dated ADJUSTMENT entries.
+ * Official NAV snapshots already struck are never rewritten: dates they
+ * cover are reported back so the ADMIN can strike a NAV correction.
+ */
+export async function correctTrade(ctx: ServiceCtx, id: number, input: TradeCorrectionInput, now: Date = new Date()): Promise<TradeCorrectionResult> {
+  assertPermission(ctx.actor, "trades:correct");
+  const reason = input.reason.trim();
+  if (reason.length < MIN_BACKDATE_REASON) {
+    throw validationError(`Give a correction reason of at least ${MIN_BACKDATE_REASON} characters.`, { reason: "Reason required" });
+  }
+  if (input.tradeDate > todayIst(now)) throw validationError("The trade date cannot be in the future.", { tradeDate: "In the future" });
+  if (input.settlementDate && input.settlementDate < input.tradeDate) {
+    throw validationError("Settlement cannot be before the trade date.", { settlementDate: "Before trade date" });
+  }
+  const combo = invalidCombination(input.product, input.action, input.side);
+  if (combo) throw validationError(combo, { action: combo });
+  const side = sideFor(input.action);
+  const computation = accountingRule(() => computeTrade({ side, quantity: input.quantity, price: input.price, charges: input.charges }));
+  if (computation.net.compare(Money.zero()) <= 0) {
+    throw validationError("Charges cannot be equal to or more than the sale value.", { estimatedCharges: "Too high" });
+  }
+
+  try {
+    return await inTransaction(async (db) => {
+      await lockFund(db, ctx.fundId);
+      await assertFundActive(db, ctx.fundId);
+      const before = await loadTrade(db, ctx.fundId, id, true);
+      if (!EFFECTIVE_TRADE_STATUSES.includes(before.status)) {
+        throw conflictError(`Only an executed or settled trade can be corrected (this one is ${before.status}). Drafts can be cancelled and re-entered.`);
+      }
+      const instrument = await one<InstrumentFacts & { id: number }>(
+        db,
+        "SELECT id, symbol, instrument_type, expiry_date::text AS expiry_date, lot_size FROM qfinera_fund_instruments WHERE id = $1",
+        [input.instrumentId]
+      );
+      if (!instrument) throw validationError("Choose a valid instrument.", { instrumentId: "Unknown instrument" });
+      assertInstrumentFitsProduct(instrument, input);
+
+      await db.query(
+        `UPDATE qfinera_fund_trades
+            SET instrument_id = $3, product = $4, position_action = $5, side = $6, trade_date = $7::date,
+                settlement_date = $8::date, quantity = $9, price = $10, brokerage = $11, stt = $12, gst = $13,
+                stamp_duty = $14, other_charges = $15, net_value = $16, external_ref = $17, notes = $18,
+                corrected_at = now(), corrected_by = $19, correction_count = correction_count + 1, updated_at = now()
+          WHERE id = $1 AND fund_id = $2`,
+        [
+          id,
+          ctx.fundId,
+          input.instrumentId,
+          input.product,
+          input.action,
+          side,
+          input.tradeDate,
+          input.settlementDate,
+          input.quantity.toDecimalString(4),
+          input.price.toDecimalString(4),
+          input.charges.brokerage.toDecimalString(2),
+          input.charges.stt.toDecimalString(2),
+          input.charges.gst.toDecimalString(2),
+          input.charges.stampDuty.toDecimalString(2),
+          input.charges.otherCharges.toDecimalString(2),
+          computation.net.toDecimalString(2),
+          input.externalRef,
+          input.notes,
+          ctx.actor.userId,
+        ]
+      );
+      const after = await loadTrade(db, ctx.fundId, id);
+      const beforeValues = editableValues(before);
+      const afterValues = editableValues(after);
+      if (JSON.stringify(beforeValues) === JSON.stringify(afterValues)) {
+        throw validationError("Nothing was changed.", { reason: "No changes to save" });
+      }
+
+      // The corrected history must still be a valid sequence of positions.
+      const history = await loadAccountingTrades(db, ctx.fundId);
+      assertValidBook(history, new Map([[after.instrument_id, after.symbol], [before.instrument_id, before.symbol]]));
+
+      const latestNav = await latestOfficialNavDate(db, ctx.fundId);
+      const earliest = before.trade_date < after.trade_date ? before.trade_date : after.trade_date;
+      const adjustments = await reconcileTradeCash(db, ctx, history, id, reason, latestNav);
+      if (adjustments.some((a) => a.isBackdated)) {
+        assertPermission(ctx.actor, "corrections:backdate");
+        if (!input.confirmed) {
+          throw conflictError(
+            `This correction changes cash on or before the latest official NAV (${latestNav}). Confirm it to proceed; official NAVs already struck are kept and can be corrected separately.`
+          );
+        }
+      }
+      const firstAdjusted = adjustments.map((a) => a.entryDate).sort()[0];
+      await assertCashNeverNegativeFrom(db, ctx.fundId, firstAdjusted && firstAdjusted < earliest ? firstAdjusted : earliest);
+
+      const revision = before.correction_count;
+      await db.query(
+        `INSERT INTO qfinera_fund_trade_revisions (fund_id, trade_id, revision, before_values, after_values, reason, corrected_by)
+         VALUES ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7)`,
+        [ctx.fundId, id, revision + 1, JSON.stringify(beforeValues), JSON.stringify(afterValues), reason, ctx.actor.userId]
+      );
+      await writeAudit(db, {
+        fundId: ctx.fundId,
+        userId: ctx.actor.userId,
+        action: "trade.corrected",
+        entityType: "trade",
+        entityId: id,
+        before: beforeValues,
+        after: { ...afterValues, revision: revision + 1, cash_adjustments: adjustments },
+        reason,
+        meta: ctx.meta,
+      });
+
+      const { rows: navs } = await db.query<{ d: string }>(
+        `SELECT as_of_date::text AS d FROM qfinera_fund_nav_snapshots
+          WHERE fund_id = $1 AND is_official AND as_of_date >= $2::date ORDER BY as_of_date`,
+        [ctx.fundId, firstAdjusted && firstAdjusted < earliest ? firstAdjusted : earliest]
+      );
+      return { trade: after, revision: revision + 1, adjustments, affectedOfficialNavDates: navs.map((n) => n.d) };
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) throw conflictError("A trade with this broker reference already exists in this fund.");
+    throw err;
+  }
+}
+
+export type TradeRevision = {
+  revision: number;
+  beforeValues: Record<string, unknown>;
+  afterValues: Record<string, unknown>;
+  reason: string;
+  correctedBy: number;
+  correctedByName: string | null;
+  correctedAt: Date;
+};
+
+export async function listTradeRevisions(db: Db, fundId: number, tradeId: number): Promise<TradeRevision[]> {
+  const { rows } = await db.query<TradeRevision>(
+    `SELECT r.revision, r.before_values AS "beforeValues", r.after_values AS "afterValues", r.reason,
+            r.corrected_by AS "correctedBy", u.display_name AS "correctedByName", r.corrected_at AS "correctedAt"
+       FROM qfinera_fund_trade_revisions r LEFT JOIN qfinance_users u ON u.id = r.corrected_by
+      WHERE r.fund_id = $1 AND r.trade_id = $2 ORDER BY r.revision`,
+    [fundId, tradeId]
+  );
+  return rows;
+}
+
 // ------------------------------------------------------------------ reads
 
 export type TradeFilter = {
@@ -680,6 +942,8 @@ export type TradeDetail = {
   computation: { gross: string; totalCharges: string; net: string; cashDelta: string };
   ledger: Array<{ id: number; entryType: string; entryDate: string; cashDelta: string; isBackdated: boolean; description: string | null }>;
   audit: AuditRecord[] | null;
+  /** Every correction, oldest first, with the values before and after. */
+  revisions: TradeRevision[];
 };
 
 export async function getTradeDetail(db: Db, actor: FundActor, fundId: number, id: number): Promise<TradeDetail> {
@@ -708,7 +972,10 @@ export async function getTradeDetail(db: Db, actor: FundActor, fundId: number, i
       gross: c.gross.toDecimalString(2),
       totalCharges: c.totalCharges.toDecimalString(2),
       net: c.net.toDecimalString(2),
-      cashDelta: c.cashDelta.toDecimalString(2),
+      // What the ledger actually holds for this trade (primary posting,
+      // correction adjustments, reversal): right for every product,
+      // including mark-to-market closes.
+      cashDelta: rows.reduce((sum, r) => sum.add(m(r.cash_delta)), Money.zero()).toDecimalString(2),
     },
     ledger: rows.map((r) => ({
       id: r.id,
@@ -719,5 +986,6 @@ export async function getTradeDetail(db: Db, actor: FundActor, fundId: number, i
       description: r.description,
     })),
     audit: hasPermission(actor, "audit:view") ? await loadEntityAudit(db, fundId, "trade", id) : null,
+    revisions: await listTradeRevisions(db, fundId, id),
   };
 }

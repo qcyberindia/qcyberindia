@@ -30,6 +30,7 @@ import {
   type ContributionRecord,
   type ContributionStatus,
 } from "@/lib/fund/services/contributions";
+import { listContributionProofs, type ProofMeta } from "@/lib/fund/services/contribution-proofs";
 import { listInstruments, marketStatus, quotesFor, type InstrumentType } from "@/lib/fund/services/market";
 import { getMemberUnits, ledgerStateNow, loadAccountingTrades, loadSettings } from "@/lib/fund/state";
 
@@ -512,6 +513,9 @@ export type ContributionListRow = {
   createdAt: Date;
   fundsConfirmedAt: Date | null;
   finalizedAt: Date | null;
+  paymentMethod: string | null;
+  utr: string | null;
+  proofCount: number;
 };
 
 export async function listContributions(
@@ -543,8 +547,12 @@ export async function listContributions(
     created_at: Date;
     funds_confirmed_at: Date | null;
     finalized_at: Date | null;
+    payment_method: string | null;
+    utr: string | null;
+    proof_count: number;
   }>(
-    `SELECT c.id, c.member_id, u.display_name AS member_name, c.amount::text AS amount,
+    `SELECT c.id, c.member_id, c.payment_method, c.utr,
+            (SELECT COUNT(*)::int FROM qfinera_fund_contribution_proofs p WHERE p.fund_id = c.fund_id AND p.contribution_id = c.id) AS proof_count, u.display_name AS member_name, c.amount::text AS amount,
             c.payment_date::text AS payment_date, c.status, c.effective_date::text AS effective_date,
             c.nav_used::text AS nav_used, c.units_allocated::text AS units_allocated,
             c.residual::text AS residual, c.created_at, c.funds_confirmed_at, c.finalized_at
@@ -572,6 +580,9 @@ export async function listContributions(
       createdAt: r.created_at,
       fundsConfirmedAt: r.funds_confirmed_at,
       finalizedAt: r.finalized_at,
+      paymentMethod: r.payment_method,
+      utr: r.utr,
+      proofCount: r.proof_count,
     })),
   };
 }
@@ -582,6 +593,8 @@ export type ContributionDetail = {
   /** For an AWAITING_NAV contribution: the NAV date that applies and whether it is official yet. */
   awaiting: { navDate: string; navOfficial: boolean } | null;
   audit: AuditRecord[] | null;
+  /** Payment proof files (metadata only; bytes come from the proof route). */
+  proofs: ProofMeta[];
 };
 
 export async function getContributionDetail(db: Db, ctx: FundContext, id: number): Promise<ContributionDetail> {
@@ -610,7 +623,8 @@ export async function getContributionDetail(db: Db, ctx: FundContext, id: number
     ? await loadEntityAudit(db, ctx.fund.id, "contribution", id)
     : null;
 
-  return { contribution: row, memberName: user?.display_name ?? "Unknown member", awaiting, audit };
+  const proofs = await listContributionProofs(db, ctx.fund.id, id);
+  return { contribution: row, memberName: user?.display_name ?? "Unknown member", awaiting, audit, proofs };
 }
 
 // ------------------------------------------------------------ members

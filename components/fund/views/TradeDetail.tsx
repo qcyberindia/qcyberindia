@@ -1,23 +1,194 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
-import type { TradeDetailDto } from "@/components/fund/api";
-import { resourceState } from "@/components/fund/common";
+import { Pencil } from "lucide-react";
+import { errorMessage, type InstrumentDto, type TradeDetailDto } from "@/components/fund/api";
+import { isPositiveDecimal, resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
-import { humanize } from "@/components/fund/format";
+import { formatMoney, humanize } from "@/components/fund/format";
 import { poolBase } from "@/components/fund/nav";
-import { PageHeader, SectionCard } from "@/components/fund/parts";
+import { DecimalField, SelectField, TextAreaField, TextField } from "@/components/fund/forms";
+import { useNotice } from "@/components/fund/notices";
+import { FormDialog } from "@/components/fund/overlays";
+import { PageHeader, SectionCard, btnSecondary } from "@/components/fund/parts";
 import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
-import { usePoolResource } from "@/components/fund/useResource";
+import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import { ActionPanel, AuditTrail, DetailGrid, StageTracker, type WorkflowAction } from "@/components/fund/workflow";
-import { SideLabel, ACTION_LABEL, InstrumentSummary, PRODUCT_LABEL } from "@/components/fund/views/shared";
+import { SideLabel, ACTION_LABEL, InstrumentPicker, InstrumentSummary, PRODUCT_LABEL, type InstrumentKind } from "@/components/fund/views/shared";
 
 const STAGES = [
   { key: "DRAFT", label: "Draft", hint: "Recorded for review. No effect on cash or holdings." },
   { key: "EXECUTED", label: "Executed", hint: "Cash and holdings changed on the trade date." },
   { key: "SETTLED", label: "Settled", hint: "Broker settlement confirmed (informational)." },
 ];
+
+type Trade = TradeDetailDto["trade"];
+
+const PRODUCT_KIND: Record<string, InstrumentKind> = { EQUITY_DELIVERY: "EQUITY", EQUITY_INTRADAY: "EQUITY", FUTURES: "FUTURE", OPTIONS: "OPTION" };
+
+/**
+ * ADMIN correction of an executed trade. The server keeps the previous
+ * values (revision + audit), re-derives positions and posts dated cash
+ * adjustments; it refuses anything the normal trade rules would refuse.
+ */
+function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; totalCharges: string; open: boolean; onClose: () => void; onDone: () => void }) {
+  const { run, pending } = usePoolMutation();
+  const { notify } = useNotice();
+  const [product, setProduct] = useState(t.product);
+  const [action, setAction] = useState(t.position_action);
+  const [instrument, setInstrument] = useState<InstrumentDto | null>({
+    id: t.instrument_id,
+    symbol: t.symbol,
+    exchange: t.exchange as InstrumentDto["exchange"],
+    name: t.instrument_name,
+    instrumentType: t.instrument_type,
+    underlying: t.underlying_symbol,
+    expiryDate: t.expiry_date,
+    strikePrice: t.strike_price,
+    optionType: t.option_type,
+  });
+  const [tradeDate, setTradeDate] = useState(t.trade_date);
+  const [settlementDate, setSettlementDate] = useState(t.settlement_date ?? "");
+  const [quantity, setQuantity] = useState(t.quantity);
+  const [price, setPrice] = useState(t.price);
+  const [estimatedCharges, setEstimatedCharges] = useState(totalCharges);
+  const [externalRef, setExternalRef] = useState(t.external_ref ?? "");
+  const [notes, setNotes] = useState(t.notes ?? "");
+  const [reason, setReason] = useState("");
+  const [confirm, setConfirm] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const longOnly = product === "EQUITY_DELIVERY";
+
+  return (
+    <FormDialog
+      open={open}
+      onClose={onClose}
+      title={`Edit trade #${t.id}`}
+      description="Correct an executed trade to match the contract note. The previous values are kept in the trade's revision history and the audit trail. Positions, cash and P&L are recalculated from the corrected history; cash differences are posted as dated adjustment entries, never by editing the ledger."
+      submitLabel="Save correction"
+      pending={pending}
+      error={error}
+      onSubmit={async () => {
+        setError(null);
+        if (!instrument) return setError("Choose an instrument.");
+        if (reason.trim().length < 10) return setError("Give a correction reason of at least 10 characters.");
+        if (!isPositiveDecimal(quantity, 4) || !isPositiveDecimal(price, 4)) return setError("Quantity and price must be greater than zero (up to 4 decimals).");
+        try {
+          const r = await run<{ adjustments: unknown[]; affectedOfficialNavDates: string[] }>(`trades/${t.id}`, {
+            action: "correct",
+            trade: { instrumentId: instrument.id, product, action, tradeDate, quantity, price, estimatedCharges: estimatedCharges.trim() || "0" },
+            settlementDate: settlementDate || undefined,
+            externalRef: externalRef.trim() || undefined,
+            notes: notes.trim() || undefined,
+            reason: reason.trim(),
+            confirm,
+          });
+          notify(
+            "success",
+            r.affectedOfficialNavDates.length > 0
+              ? `Trade corrected. Official NAVs already struck for ${r.affectedOfficialNavDates.join(", ")} were not changed; strike a NAV correction if needed.`
+              : `Trade corrected${r.adjustments.length ? `; ${r.adjustments.length} cash adjustment${r.adjustments.length === 1 ? "" : "s"} posted` : ""}.`
+          );
+          onDone();
+          onClose();
+        } catch (err) {
+          setError(errorMessage(err));
+        }
+      }}
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <SelectField
+          label="Product"
+          value={product}
+          onChange={(v) => {
+            const next = v as Trade["product"];
+            if (PRODUCT_KIND[next] !== PRODUCT_KIND[product]) setInstrument(null);
+            if (next === "EQUITY_DELIVERY" && action.endsWith("SHORT")) setAction("OPEN_LONG");
+            setProduct(next);
+          }}
+          options={Object.entries(PRODUCT_LABEL).map(([value, label]) => ({ value, label }))}
+        />
+        <SelectField
+          label="Position"
+          value={action}
+          onChange={(v) => setAction(v as Trade["position_action"])}
+          options={Object.entries(ACTION_LABEL)
+            .filter(([value]) => !(longOnly && value.endsWith("SHORT")))
+            .map(([value, label]) => ({ value, label }))}
+        />
+      </div>
+      <InstrumentPicker key={PRODUCT_KIND[product]} kind={PRODUCT_KIND[product]} value={instrument} onChange={setInstrument} />
+      <div className="grid gap-4 sm:grid-cols-2">
+        <TextField label="Trade date" type="date" value={tradeDate} onChange={setTradeDate} required />
+        <TextField label="Settlement date" type="date" value={settlementDate} onChange={setSettlementDate} />
+        <DecimalField label="Quantity" value={quantity} onChange={setQuantity} decimals={4} required />
+        <DecimalField label="Price (₹)" value={price} onChange={setPrice} decimals={4} required />
+      </div>
+      <DecimalField label="Estimated charges (₹)" value={estimatedCharges} onChange={setEstimatedCharges} decimals={2} hint="One total. QFinera does not calculate broker charges." />
+      <TextField label="Contract note / broker reference" value={externalRef} onChange={setExternalRef} maxLength={64} />
+      <TextAreaField label="Notes" value={notes} onChange={setNotes} maxLength={1000} rows={2} />
+      <TextAreaField label="Correction reason" value={reason} onChange={setReason} maxLength={500} rows={2} required hint="At least 10 characters. Shown in the revision history and audit trail." />
+      <label className="flex items-start gap-2 text-[13px]">
+        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} className="mt-0.5 h-4 w-4" />
+        If this changes cash on or before the latest official NAV, I confirm the correction. Official NAVs already struck are kept unchanged.
+      </label>
+    </FormDialog>
+  );
+}
+
+function valueText(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  if (typeof v === "object") {
+    // Charges object: show the total, summed exactly as paise (decimal strings, no floats).
+    const c = v as Record<string, string>;
+    const paise = ["brokerage", "stt", "gst", "stamp_duty", "other_charges"].reduce((sum, k) => {
+      const [w, f = ""] = (c[k] ?? "0").split(".");
+      return sum + BigInt(w) * 100n + BigInt((f + "00").slice(0, 2));
+    }, 0n);
+    return formatMoney(`${paise / 100n}.${String(paise % 100n).padStart(2, "0")}`);
+  }
+  return String(v);
+}
+
+const REVISION_FIELDS: Array<[string, string]> = [
+  ["instrument", "Instrument"],
+  ["product", "Product"],
+  ["position_action", "Position"],
+  ["trade_date", "Trade date"],
+  ["quantity", "Quantity"],
+  ["price", "Price"],
+  ["charges", "Charges"],
+  ["settlement_date", "Settlement date"],
+  ["external_ref", "Broker reference"],
+  ["notes", "Notes"],
+];
+
+function Revisions({ revisions }: { revisions: TradeDetailDto["revisions"] }) {
+  return (
+    <ol className="divide-y divide-[var(--qf-line)]">
+      {revisions.map((r) => {
+        const changed = REVISION_FIELDS.filter(([k]) => JSON.stringify(r.beforeValues[k]) !== JSON.stringify(r.afterValues[k]));
+        return (
+          <li key={r.revision} className="px-4 py-3 text-[13.5px]">
+            <p className="font-semibold">
+              Revision {r.revision} · {r.correctedByName ?? "Administrator"} · <DateDisplay value={r.correctedAt} />
+            </p>
+            <p className="mt-0.5 text-[var(--qf-ink-soft)]">Reason: {r.reason}</p>
+            <ul className="mt-2 space-y-0.5">
+              {changed.map(([k, label]) => (
+                <li key={k}>
+                  {label}: <span className="line-through opacity-70">{valueText(r.beforeValues[k])}</span> → <strong>{valueText(r.afterValues[k])}</strong>
+                </li>
+              ))}
+            </ul>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
 
 export function TradeDetail({ id }: { id: string }) {
   const can = useCan();
@@ -27,6 +198,8 @@ export function TradeDetail({ id }: { id: string }) {
   const state = valid ? resourceState(res, "the trade") : null;
   const d = res.data;
   const t = d?.trade;
+  const [editing, setEditing] = useState(false);
+  const canEdit = t !== undefined && ["EXECUTED", "SETTLED", "FINALIZED"].includes(t.status) && can("trades:correct");
 
   const actions: WorkflowAction[] = [];
   if (t) {
@@ -53,7 +226,20 @@ export function TradeDetail({ id }: { id: string }) {
 
   return (
     <>
-      <PageHeader eyebrow="Trade" title={t ? `Trade #${t.id} · ${t.symbol}` : "Trade"} actions={<Link href={`${poolBase(poolId)}/trades`} className="text-[13px] underline">Back to trades</Link>} />
+      <PageHeader
+        eyebrow="Trade"
+        title={t ? `Trade #${t.id} · ${t.symbol}` : "Trade"}
+        actions={
+          <>
+            {canEdit && (
+              <button type="button" className={btnSecondary} onClick={() => setEditing(true)}>
+                <Pencil size={15} aria-hidden="true" /> Edit trade
+              </button>
+            )}
+            <Link href={`${poolBase(poolId)}/trades`} className="text-[13px] underline">Back to trades</Link>
+          </>
+        }
+      />
       {state ? (
         <SectionCard flush>{state}</SectionCard>
       ) : !t || !d ? null : (
@@ -82,19 +268,22 @@ export function TradeDetail({ id }: { id: string }) {
                 { label: "Quantity", value: <QuantityDisplay value={t.quantity} /> },
                 { label: "Price", value: <MoneyDisplay value={t.price} dp={4} /> },
                 { label: "Gross", value: <MoneyDisplay value={d.computation.gross} /> },
-                { label: "Total charges", value: <MoneyDisplay value={d.computation.totalCharges} /> },
+                { label: "Estimated charges", value: <MoneyDisplay value={d.computation.totalCharges} /> },
                 { label: "Net value", value: <MoneyDisplay value={d.computation.net} /> },
                 { label: "Cash effect", value: <MoneyDisplay value={d.computation.cashDelta} signed /> },
                 { label: "Broker reference", value: t.external_ref ?? "—" },
                 { label: "Backdated", value: t.is_backdated ? `Yes: ${t.backdated_reason ?? ""}` : "No" },
                 { label: "Reversal reason", value: t.reversal_reason ?? "—" },
                 { label: "Notes", value: t.notes ?? "—" },
+                { label: "Corrections", value: t.correction_count > 0 ? `${t.correction_count} (last ${new Date(t.corrected_at ?? "").toLocaleDateString("en-IN")})` : "None" },
               ]}
             />
-            <p className="mt-4 text-[12.5px] text-[var(--qf-ink-soft)]">
-              Charges: brokerage ₹{t.brokerage}, STT ₹{t.stt}, GST ₹{t.gst}, stamp duty ₹{t.stamp_duty}, other ₹{t.other_charges}.
-            </p>
           </SectionCard>
+          {d.revisions.length > 0 && (
+            <SectionCard title="Revision history" description="Every correction, with the values before and after. Nothing is overwritten silently." flush>
+              <Revisions revisions={d.revisions} />
+            </SectionCard>
+          )}
           <ActionPanel path={`trades/${t.id}`} actions={actions} onDone={res.reload} />
           {d.ledger.length > 0 && (
             <SectionCard title="Ledger entries" flush>
@@ -111,6 +300,7 @@ export function TradeDetail({ id }: { id: string }) {
               />
             </SectionCard>
           )}
+          {canEdit && <EditTrade key={`${t.id}:${t.correction_count}:${editing}`} t={t} totalCharges={d.computation.totalCharges} open={editing} onClose={() => setEditing(false)} onDone={res.reload} />}
           {d.audit && (
             <SectionCard title="Audit trail" flush>
               <AuditTrail items={d.audit} />

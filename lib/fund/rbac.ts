@@ -46,6 +46,7 @@ export type FundPermission =
   | "withdrawals:approve"
   | "trades:reverse"
   | "trades:backdate"
+  | "trades:correct"
   | "nav:finalize"
   | "expenses:approve"
   | "audit:view"
@@ -90,6 +91,7 @@ const ADMIN_EXTRA: readonly FundPermission[] = [
   "withdrawals:approve",
   "trades:reverse",
   "trades:backdate",
+  "trades:correct",
   "nav:finalize",
   "expenses:approve",
   "audit:view",

@@ -20,7 +20,8 @@ export type NavIcon =
   | "expenses"
   | "reports"
   | "audit"
-  | "settings";
+  | "settings"
+  | "guide";
 
 export type NavItem = { segment: string; label: string; icon: NavIcon; permission: UiPermission };
 
@@ -36,6 +37,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { segment: "reports", label: "Reports", icon: "reports", permission: "reports:view" },
   { segment: "audit", label: "Audit", icon: "audit", permission: "audit:view" },
   { segment: "settings", label: "Settings", icon: "settings", permission: "settings:view" },
+  { segment: "guide", label: "Guide", icon: "guide", permission: "fund:view" },
 ];
 
 export function visibleNav(can: (permission: UiPermission) => boolean): NavItem[] {

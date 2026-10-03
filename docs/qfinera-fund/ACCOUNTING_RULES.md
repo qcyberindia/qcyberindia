@@ -172,3 +172,38 @@ Each contract is unique per (exchange, underlying, expiry, type, strike, CE/PE).
 - **Gross exposure** = long + short. **Net exposure** = long − short.
 - **Tax estimate:** now uses `EQUITY_DELIVERY` trades only. In India, intraday equity is speculative business income and F&O is non-speculative business income, so neither is folded into capital gains; it appears as realized trading P&L.
 
+
+## 11. Contribution review, estimated charges, trade corrections (migration 013)
+
+### Contributions
+
+- Displayed stages: Pending approval → Approved → Funds confirmed → Awaiting NAV → Finalized.
+  - "Funds confirmed" and "Awaiting NAV" are one stored status (`AWAITING_NAV`): confirming funds is what starts the wait and fixes the NAV date.
+  - Unit allocation is unchanged (section 2).
+- **Segregation of duties.** An ADMIN may not approve, or confirm funds for, their **own** contribution while another active ADMIN exists. A pool's sole ADMIN may. The audit action is then `contribution.self_approved` / `contribution.self_confirmed_funds`, with the reason "Self-confirmed (sole administrator)" and `self_confirmed: true`.
+- **Payment details:** `payment_method` (UPI, IMPS, NEFT, RTGS, BANK_TRANSFER, CHEQUE, CASH, OTHER), UTR/reference, payment date and notes.
+- **Proof files** (`qfinera_fund_contribution_proofs`):
+  - Format: PNG, JPEG, WebP or PDF, verified by file signature; at most 2 MB.
+  - Stored in the database. Served only to the contributor and MANAGER/ADMIN, with `nosniff` and a sandboxing CSP.
+  - Append-only. Files can be added until the contribution is finalized, rejected or cancelled.
+
+### Estimated charges
+
+- A trade's charges are entered as **one estimated total**: the manager's estimate or the contract-note total. QFinera does not calculate broker-specific charges.
+- It is stored in `other_charges`, with the other component columns at zero, so every existing sum (net value, cost basis, realized P&L, cash) is unchanged.
+- Older trades keep their component values. The API still accepts the component fields, but never together with `estimatedCharges`.
+
+### Correcting an executed trade
+
+ADMIN only (`trades:correct`), with a reason of at least 10 characters.
+
+1. The trade row takes the corrected values. `correction_count`, `corrected_at` and `corrected_by` are updated.
+2. The values before and after, the reason, the admin and the time go into the append-only `qfinera_fund_trade_revisions` and the audit log (`trade.corrected`).
+3. The corrected history must still be a valid sequence of positions (section 10), and cash must never go negative. Otherwise the whole correction is refused and nothing changes.
+4. Positions, realized/unrealized P&L and exposure follow automatically, because they are replayed from trades.
+5. **Cash is re-derived for every executed trade** (`replayCash`) and compared, per trade and date, with what the ledger holds. Each difference is posted as an `ADJUSTMENT` entry referencing that trade on that date. The original postings are never edited. Consequences:
+   - A changed trade date moves the cash: one adjustment on the old date, one on the new date.
+   - Correcting an intraday or futures open re-derives the cash of the later closes that depend on it.
+6. If any adjustment falls on or before the latest official NAV, it is marked backdated and the ADMIN must confirm. Official NAV snapshots are **not** rewritten. The response lists the affected official NAV dates so a NAV correction can be struck (section 3a), and units already allocated stay unchanged, as with every backdated correction.
+7. Reversing a trade undoes its whole cash effect: the primary posting plus any correction adjustments.
+8. Drafts are not corrected; they are cancelled and re-entered. Reversed trades cannot be corrected.

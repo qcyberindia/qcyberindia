@@ -34,7 +34,7 @@ export function StageTracker({
   }
   const current = stages.findIndex((s) => s.key === status);
   return (
-    <ol className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" aria-label="Progress">
+    <ol className={`grid gap-3 sm:grid-cols-2 ${stages.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-4"}`} aria-label="Progress">
       {stages.map((s, i) => {
         const done = current > i || (current === i && i === stages.length - 1);
         const active = current === i && !done;

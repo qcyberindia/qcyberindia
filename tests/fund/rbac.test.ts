@@ -23,6 +23,7 @@ const ADMIN_ONLY: FundPermission[] = [
   "withdrawals:approve",
   "trades:reverse",
   "trades:backdate",
+  "trades:correct",
   "nav:finalize",
   "expenses:approve",
   "audit:view",

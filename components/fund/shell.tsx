@@ -15,8 +15,7 @@ import {
   Receipt,
   ScrollText,
   Settings,
-  Users,
-} from "lucide-react";
+  Users, BookOpen } from "lucide-react";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import { Drawer } from "@/components/fund/overlays";
 import { NAV_ITEMS, POOLS_BASE, isNavActive, poolBase, visibleNav, type NavIcon } from "@/components/fund/nav";
@@ -37,6 +36,7 @@ const ICONS: Record<NavIcon, typeof Users> = {
   reports: FileText,
   audit: ScrollText,
   settings: Settings,
+  guide: BookOpen,
 };
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--qf-brass)]";
