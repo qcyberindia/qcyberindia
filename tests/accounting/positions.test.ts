@@ -10,6 +10,7 @@ import {
   invalidCombination,
   navValue,
   replayBook,
+  replayCash,
   sideFor,
   unrealized,
   type BookPosition,
@@ -211,5 +212,71 @@ describe("replay and exposure", () => {
       { position: short, price: m("190") },
     ]);
     expect([e.long, e.short, e.gross, e.net].map(s2)).toEqual(["1100.00", "950.00", "2050.00", "150.00"]);
+  });
+});
+
+describe("replayCash: the cash each execution posts, re-derived from history", () => {
+  const bt = (id: number, instrumentId: number, product: BookTrade["product"], action: BookTrade["action"], qty: string, price: string, charges = "0", date = "2026-09-02"): BookTrade => ({
+    id,
+    instrumentId,
+    tradeDate: date,
+    ...ex(product, action, qty, price, charges),
+  });
+  const cash = (trades: BookTrade[]) => Object.fromEntries([...replayCash(trades)].map(([id, v]) => [id, `${v.tradeDate} ${s2(v.cashDelta)}`]));
+
+  it("matches the cash applyExecution posts at execution, for every product and direction", () => {
+    const trades = [
+      bt(1, 1, "EQUITY_DELIVERY", "OPEN_LONG", "10", "1500", "20.00"),
+      bt(2, 1, "EQUITY_DELIVERY", "CLOSE_LONG", "4", "1510", "10.00"),
+      bt(3, 2, "EQUITY_INTRADAY", "OPEN_SHORT", "100", "1520", "30.00"),
+      bt(4, 2, "EQUITY_INTRADAY", "CLOSE_SHORT", "40", "1500"),
+      bt(5, 2, "EQUITY_INTRADAY", "CLOSE_SHORT", "60", "1490", "25.00"),
+      bt(6, 3, "FUTURES", "OPEN_LONG", "75", "25000", "20.00"),
+      bt(7, 3, "FUTURES", "CLOSE_LONG", "75", "25100", "20.00"),
+      bt(8, 4, "OPTIONS", "OPEN_SHORT", "75", "80"),
+      bt(9, 4, "OPTIONS", "CLOSE_SHORT", "75", "60", "5.00"),
+    ];
+    expect(cash(trades)).toEqual({
+      1: "2026-09-02 -15020.00", // delivery: full value + charges
+      2: "2026-09-02 6030.00",
+      3: "2026-09-02 -30.00", // intraday short: only charges on open
+      4: "2026-09-02 800.00", // (1520-1500) x 40
+      5: "2026-09-02 1775.00", // (1520-1490) x 60 - 25
+      6: "2026-09-02 -20.00", // futures: no notional
+      7: "2026-09-02 7480.00",
+      8: "2026-09-02 6000.00", // short option: premium received
+      9: "2026-09-02 -4505.00", // buy back premium + charges
+    });
+    // The same numbers, step by step, as the execution path computes them.
+    let total = Money.zero();
+    for (const v of replayCash(trades).values()) total = total.add(v.cashDelta);
+    expect(s2(total)).toBe("2510.00");
+  });
+
+  it("replays in (trade date, id) order whatever order trades arrive in", () => {
+    const a = [bt(2, 1, "EQUITY_INTRADAY", "CLOSE_SHORT", "10", "90", "0", "2026-09-03"), bt(1, 1, "EQUITY_INTRADAY", "OPEN_SHORT", "10", "100", "0", "2026-09-02")];
+    expect(cash(a)).toEqual({ 1: "2026-09-02 0.00", 2: "2026-09-03 100.00" });
+  });
+
+  it("a corrected open changes the cash of the later mark-to-market close", () => {
+    const original = [bt(1, 1, "EQUITY_INTRADAY", "OPEN_SHORT", "100", "1520"), bt(2, 1, "EQUITY_INTRADAY", "CLOSE_SHORT", "100", "1490")];
+    const corrected = [bt(1, 1, "EQUITY_INTRADAY", "OPEN_SHORT", "100", "1530"), bt(2, 1, "EQUITY_INTRADAY", "CLOSE_SHORT", "100", "1490")];
+    expect(cash(original)[2]).toBe("2026-09-02 3000.00");
+    expect(cash(corrected)[2]).toBe("2026-09-02 4000.00");
+    expect(cash(corrected)[1]).toBe("2026-09-02 0.00");
+  });
+
+  it("a corrected delivery buy changes only its own cash (premium products are independent)", () => {
+    const corrected = [bt(1, 1, "EQUITY_DELIVERY", "OPEN_LONG", "12", "1500", "20.00"), bt(2, 1, "EQUITY_DELIVERY", "CLOSE_LONG", "4", "1510", "10.00")];
+    expect(cash(corrected)).toEqual({ 1: "2026-09-02 -18020.00", 2: "2026-09-02 6030.00" });
+  });
+
+  it("keeps products of one instrument apart", () => {
+    const trades = [bt(1, 1, "EQUITY_DELIVERY", "OPEN_LONG", "10", "100"), bt(2, 1, "EQUITY_INTRADAY", "OPEN_SHORT", "10", "100"), bt(3, 1, "EQUITY_INTRADAY", "CLOSE_SHORT", "10", "95")];
+    expect(cash(trades)).toEqual({ 1: "2026-09-02 -1000.00", 2: "2026-09-02 0.00", 3: "2026-09-02 50.00" });
+  });
+
+  it("refuses an invalid history instead of inventing cash", () => {
+    expect(() => replayCash([bt(1, 1, "EQUITY_DELIVERY", "CLOSE_LONG", "1", "100")])).toThrow(PositionError);
   });
 });

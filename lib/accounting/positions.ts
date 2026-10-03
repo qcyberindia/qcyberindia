@@ -287,3 +287,21 @@ export function exposure(entries: ReadonlyArray<{ position: BookPosition; price:
   }
   return { long, short, gross: long.add(short), net: long.subtract(short) };
 }
+
+/**
+ * The cash each execution should have posted, replaying the whole history
+ * in (trade date, id) order. Used to re-derive cash after a trade is
+ * corrected: a mark-to-market close's cash depends on the open it closes,
+ * so correcting one execution can change later ones.
+ */
+export function replayCash(trades: readonly BookTrade[]): Map<number, { tradeDate: string; cashDelta: Money }> {
+  const out = new Map<number, { tradeDate: string; cashDelta: Money }>();
+  const positions = new Map<string, BookPosition>();
+  for (const t of sortTrades(trades)) {
+    const key = positionKey(t.instrumentId, t.product);
+    const effect = applyExecution(positions.get(key) ?? emptyBookPosition(), t);
+    positions.set(key, effect.position);
+    out.set(t.id, { tradeDate: t.tradeDate, cashDelta: effect.cashDelta });
+  }
+  return out;
+}
