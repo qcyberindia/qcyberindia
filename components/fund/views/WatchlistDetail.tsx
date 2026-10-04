@@ -17,7 +17,7 @@ import { WATCH_STATUSES } from "@/components/fund/views/WatchlistView";
 
 export function WatchlistDetail({ id }: { id: string }) {
   const can = useCan();
-  const { poolId } = useFund();
+  const { poolId, userId } = useFund();
   const valid = /^\d{1,9}$/.test(id);
   const res = usePoolResource<{ item: WatchItem; comments: WatchComment[] }>(valid ? `watchlist/${id}` : null);
   const state = valid ? resourceState(res, "the watchlist item") : null;
@@ -78,7 +78,7 @@ export function WatchlistDetail({ id }: { id: string }) {
               ]}
             />
             {item.thesis && <p className="mt-4 whitespace-pre-wrap text-[14px] leading-relaxed text-[var(--qf-ink)]">{item.thesis}</p>}
-            {can("watchlist:write") && (
+            {(can("watchlist:write") || (can("watchlist:create") && item.createdBy === userId)) && (
               <div className="mt-4 flex flex-wrap items-end gap-2 border-t border-[var(--qf-line)] pt-4">
                 {!item.archivedAt && (
                   <label className="flex flex-col gap-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">

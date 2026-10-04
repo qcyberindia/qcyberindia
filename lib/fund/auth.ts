@@ -10,6 +10,9 @@
 //     member of that fund gets "not found" (no existence leak).
 //   * A suspended user or suspended membership has no permissions.
 //   * Roles are never read from the client.
+//   * A pool scheduled for deletion (deleted_at set) does not exist here
+//     for anyone; only its ADMINs can see and restore it, through
+//     lib/fund/services/pool-deletion.ts.
 import type { SessionPayload } from "@/lib/qfinance-community-auth";
 import { getRequestSession, getServerSession } from "@/lib/qfinera-auth/http";
 import type { AuthSession } from "@/lib/qfinera-auth/sessions";
@@ -82,7 +85,7 @@ export async function resolveFundContext(
             m.role, m.status AS membership_status
        FROM qfinera_fund_memberships m
        JOIN qfinera_funds f ON f.id = m.fund_id
-      WHERE m.user_id = $1 AND m.status <> 'removed'
+      WHERE m.user_id = $1 AND m.status <> 'removed' AND f.deleted_at IS NULL
       ORDER BY m.fund_id`,
     [session.userId]
   );

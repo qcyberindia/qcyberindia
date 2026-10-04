@@ -128,6 +128,7 @@ export default function QFinanceLayout({
 
           --qf-ink: #2B2621;
           --qf-ink-soft: #5B5347;
+          --qf-ink-muted: #6E6556;
 
           --qf-line: #D8CBA9;
 
@@ -136,6 +137,10 @@ export default function QFinanceLayout({
 
           --qf-fix: #3E6B52;
           --qf-fix-bg: #E7F0EA;
+
+          /* Chart series (validated for CVD separation against this surface). */
+          --qf-chart-1: #B07A1E;
+          --qf-chart-2: #2F6DB0;
         }
 
         /* -------------------------------------------------------------
@@ -153,6 +158,7 @@ export default function QFinanceLayout({
 
           --qf-ink: #F3EDDD;
           --qf-ink-soft: #B9AF9D;
+          --qf-ink-muted: #A39985;
 
           --qf-line: #494237;
 
@@ -161,6 +167,9 @@ export default function QFinanceLayout({
 
           --qf-fix: #6FA98B;
           --qf-fix-bg: #23302A;
+
+          --qf-chart-1: #B88328;
+          --qf-chart-2: #4E86CC;
         }
       `}</style>
 

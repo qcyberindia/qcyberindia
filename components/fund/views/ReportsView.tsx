@@ -12,7 +12,7 @@ import { Disclaimer, EmptyState, MetricCard, PageHeader, SectionCard, btnPrimary
 import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
-import { DetailGrid } from "@/components/fund/workflow";
+import { APPROVAL_SENT, ApprovalNotice, DetailGrid, isPendingApproval } from "@/components/fund/workflow";
 import { DirectionLabel, PRODUCT_LABEL, SideLabel, instrumentLabel, todayIstInput } from "@/components/fund/views/shared";
 
 type Tab = "daily" | "nav-history" | "statement" | "positions" | "tax";
@@ -42,6 +42,7 @@ function SnapshotFigures({ s }: { s: NavSnapshot }) {
 function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const proposing = useFund().role === "MANAGER";
   const [reason, setReason] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +54,13 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
   return (
     <SectionCard
       title={p.official ? "Correct the official NAV" : "Strike the official NAV"}
-      description="Administrator only. Computed from the ledger and that day's recorded closing prices. Nothing is estimated."
+      description="Computed from the ledger and that day's recorded closing prices. Nothing is estimated."
     >
+      {proposing && (
+        <div className="mb-4">
+          <ApprovalNotice />
+        </div>
+      )}
       {p.problems.length > 0 && (
         <ul role="alert" className="mb-4 list-disc space-y-1 rounded-md border border-[var(--qf-down)]/30 bg-[var(--qf-down)]/10 py-2 pl-7 pr-3 text-[13px] text-[var(--qf-ink)]">
           {p.problems.map((x) => (
@@ -135,12 +141,16 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
           setError(null);
           setResult(null);
           try {
-            const r = await run<StrikeResultDto>("nav", {
+            const r = await run<StrikeResultDto | { pendingApproval: true }>("nav", {
               date: p.date,
               ...(p.requiresCorrection ? { correctionReason: reason.trim(), confirmCorrection: confirm } : {}),
             });
-            setResult(r);
-            notify("success", `Official NAV for ${p.date} recorded.`);
+            if (isPendingApproval(r)) {
+              notify("success", APPROVAL_SENT);
+            } else {
+              setResult(r as StrikeResultDto);
+              notify("success", `Official NAV for ${p.date} recorded.`);
+            }
             onDone();
           } catch (err) {
             setError(errorMessage(err));
@@ -148,7 +158,7 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
         }}
       >
         {pending && <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
-        {p.official ? "Record corrected NAV" : "Strike official NAV"}
+        {proposing ? "Send for approval" : p.official ? "Record corrected NAV" : "Strike official NAV"}
       </button>
     </SectionCard>
   );

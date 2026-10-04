@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, ShieldCheck } from "lucide-react";
 import { errorMessage } from "@/components/fund/api";
 import { DateDisplay, StatusBadge } from "@/components/fund/display";
 import { DecimalField, inputClass } from "@/components/fund/forms";
@@ -9,6 +9,7 @@ import { humanize } from "@/components/fund/format";
 import { useNotice } from "@/components/fund/notices";
 import { Modal } from "@/components/fund/overlays";
 import { SectionCard, btnDanger, btnPrimary, btnSecondary } from "@/components/fund/parts";
+import { useFund } from "@/components/fund/session";
 import { usePoolMutation } from "@/components/fund/useResource";
 import type { Audit } from "@/components/fund/api";
 
@@ -149,9 +150,28 @@ export type WorkflowAction = {
   /** Require ticking an explicit confirmation (sent as `confirm: true`). */
   confirmText?: string;
   success: string;
+  /** An ADMIN-only change: for a MANAGER it is sent for administrator approval instead. */
+  approval?: boolean;
 };
 
+export const APPROVAL_SENT = "Sent to an administrator for approval. Nothing changes until they approve it.";
+
+/** True when the API answered 202: a MANAGER's change is waiting for an administrator. */
+export function isPendingApproval(result: unknown): boolean {
+  return (result as { pendingApproval?: unknown } | null)?.pendingApproval === true;
+}
+
 const VARIANT = { primary: btnPrimary, danger: btnDanger, secondary: btnSecondary } as const;
+
+/** Shown before a MANAGER submits an ADMIN-only change. */
+export function ApprovalNotice() {
+  return (
+    <p className="flex gap-2 rounded-md border border-[var(--qf-brass)]/40 bg-[var(--qf-brass)]/10 px-3 py-2 text-[13px] text-[var(--qf-ink)]">
+      <ShieldCheck size={15} className="mt-0.5 shrink-0 text-[var(--qf-brass-dark)]" aria-hidden="true" />
+      <span>As a manager, this is sent to an administrator for approval. Nothing changes until they approve it.</span>
+    </p>
+  );
+}
 
 function ActionForm({
   action,
@@ -166,6 +186,8 @@ function ActionForm({
 }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const { role } = useFund();
+  const proposing = action.approval === true && role === "MANAGER";
   const [reason, setReason] = useState("");
   const [charges, setCharges] = useState("0.00");
   const [backdateReason, setBackdateReason] = useState("");
@@ -189,8 +211,8 @@ function ActionForm({
     }
     if (action.confirmText !== undefined) body.confirm = confirmed;
     try {
-      await run(path, body);
-      notify("success", action.success);
+      const result = await run(path, body);
+      notify("success", isPendingApproval(result) ? APPROVAL_SENT : action.success);
       onDone();
       onClose();
     } catch (err) {
@@ -206,6 +228,7 @@ function ActionForm({
       }}
     >
       <div className="space-y-4 px-5 py-4 text-[14px]">
+        {proposing && <ApprovalNotice />}
         <p className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-3 py-2 text-[13px] text-[var(--qf-ink-soft)]">
           {action.consequences}
         </p>
@@ -271,7 +294,7 @@ function ActionForm({
         </button>
         <button type="submit" disabled={blocked} className={action.variant === "danger" ? btnDanger : btnPrimary}>
           {pending && <Loader2 size={14} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}
-          {pending ? "Working…" : action.label}
+          {pending ? "Working…" : proposing ? "Send for approval" : action.label}
         </button>
       </div>
     </form>

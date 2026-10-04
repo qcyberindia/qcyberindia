@@ -205,7 +205,7 @@ function PositionsTable({ rows, caption, closed, delivery = false }: { rows: rea
               { key: "a", header: "Entry", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.averageEntryPrice} dp={4} /> },
               {
                 key: "p",
-                header: "LTP",
+                header: "Last recorded price",
                 align: "right" as const,
                 cell: (r: Row) => (
                   <span className="flex flex-col items-end gap-1" title={r.priceAsOf ? `Price as of ${new Date(r.priceAsOf).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST` : (r.priceUnavailableReason ?? undefined)}>

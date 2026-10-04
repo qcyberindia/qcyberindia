@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, CheckCircle2, MessageCircleQuestion, Rocket } from "lucide-react";
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, Layers, MessageCircleQuestion } from "lucide-react";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import LearningSection from "@/components/qfinance/learning/LearningSection";
@@ -99,19 +99,14 @@ export default function ChapterNextStepPage() {
               <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="rounded-md border border-[var(--qf-brass)]/40 bg-[var(--qf-brass)]/[0.06] p-5">
-            <Rocket size={22} className="text-[var(--qf-brass-dark)]" />
-            <p className="mt-3 font-display text-[15px] font-semibold text-[var(--qf-ink)]">
-              Want to help shape what&apos;s next?
-            </p>
+          <div className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5">
+            <Eye size={22} className="text-[var(--qf-brass)]" />
+            <p className="mt-3 font-display text-[15px] font-semibold text-[var(--qf-ink)]">See what members are watching</p>
             <p className="mt-1.5 text-[13.5px] text-[var(--qf-ink-soft)]">
-              QFinera is still early. Join the beta to get access as new tools are built.
+              Announcements, research and risks other members found useful, in Global Watch.
             </p>
-            <Link
-              href="/qfinera/beta"
-              className="mt-3 inline-flex items-center gap-1.5 font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline"
-            >
-              Join the Beta
+            <Link href="/qfinera/watch" className="mt-3 inline-flex items-center gap-1.5 font-display text-sm font-semibold text-[var(--qf-brass-dark)] hover:underline">
+              Explore Global Watch
               <ArrowRight size={14} />
             </Link>
           </div>
@@ -125,6 +120,33 @@ export default function ChapterNextStepPage() {
           — it&apos;s always there, in the same order, whenever you need it again.
         </p>
       </LearningSection>
+
+      <section aria-labelledby="pool-cta" className="px-6 pb-4">
+        <div className="mx-auto max-w-xl rounded-xl border border-[var(--qf-brass)]/45 bg-[var(--qf-brass)]/[0.07] p-6 sm:p-7">
+          <Layers size={24} className="text-[var(--qf-brass-dark)]" aria-hidden="true" />
+          <h2 id="pool-cta" className="mt-3 font-display text-[22px] font-semibold leading-snug text-[var(--qf-ink)]">
+            Ready to understand how a pool works?
+          </h2>
+          <p className="mt-2 text-[14.5px] leading-relaxed text-[var(--qf-ink-soft)]">
+            Many people invest together with family or friends. A QFinera pool keeps one fair, shared record: who put in what, units at a daily NAV, every
+            trade, and a full audit trail.
+          </p>
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <Link
+              href="/qfinera/learn/pool-guide"
+              className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md bg-[var(--qf-brass-dark)] px-5 font-display text-[15px] font-semibold text-[var(--qf-cream-0)] hover:opacity-90"
+            >
+              Explore Pool Management <ArrowRight size={15} aria-hidden="true" />
+            </Link>
+            <Link
+              href="/qfinera/pools"
+              className="inline-flex min-h-11 items-center justify-center rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-0)] px-5 text-[15px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)]"
+            >
+              Go to Pools
+            </Link>
+          </div>
+        </div>
+      </section>
 
       <LearningSection tight>
         <div className="flex items-center justify-between text-sm">

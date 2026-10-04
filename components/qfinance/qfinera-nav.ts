@@ -1,10 +1,11 @@
 // The one QFinera navigation model, shared by the desktop header, the
 // mobile tab bar and the footer. Pure data.
-export type QNavItem = { href: string; label: string; match: string[] };
+export type QNavItem = { href: string; label: string; match: readonly string[] };
 
 export const PRIMARY_NAV: readonly QNavItem[] = [
-  { href: "/qfinera/learn/beginner", label: "Learn", match: ["/qfinera/learn", "/qfinera/beginner"] },
+  { href: "/qfinera/learn", label: "Learn", match: ["/qfinera/learn", "/qfinera/beginner"] },
   { href: "/qfinera/research", label: "Research", match: ["/qfinera/research", "/qfinera/why-india-investing"] },
+  { href: "/qfinera/watch", label: "Global Watch", match: ["/qfinera/watch"] },
   { href: "/qfinera/community", label: "Community", match: ["/qfinera/community"] },
   { href: "/qfinera/pools", label: "Pools", match: ["/qfinera/pools"] },
 ];

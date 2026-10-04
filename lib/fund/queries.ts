@@ -253,7 +253,20 @@ export type DashboardData = {
   memberCount: number;
   holdings: HoldingsSummary;
   /** Counts within the caller's visibility. draftTrades/expenses are null when not visible to the role. */
-  pending: { contributions: number; withdrawals: number; draftTrades: number | null; expenses: number | null };
+  pending: {
+    contributions: number;
+    withdrawals: number;
+    draftTrades: number | null;
+    expenses: number | null;
+    /** Manager requests awaiting an administrator (requests:view), else null. */
+    approvals: number | null;
+    /** Viewers asking to become members (join_requests:review), else null. */
+    joinRequests: number | null;
+  };
+  /** All-time finalized flows from the ledger (positive decimal strings). */
+  totals: { contributions: string; withdrawals: string };
+  /** Realized + unrealized; null when unrealized is unknown (an unpriced position). */
+  totalPnl: string | null;
   /** Latest audit events; only for roles with audit:view, otherwise null. */
   recentActivity: AuditRecord[] | null;
   /** Calendar-based market session state (not an exchange feed). */
@@ -278,6 +291,17 @@ export type DashboardData = {
     status: string;
     createdAt: Date;
   }>;
+  /**
+   * History for the dashboard charts, from official NAV snapshots and the
+   * ledger only (never estimated). Null for roles without reports:view.
+   */
+  charts: {
+    nav: Array<{ date: string; nav: string; fundValue: string; cash: string; holdingsValue: string }>;
+    /** Calendar months (IST) with finalized flows, oldest first; amounts are positive decimal strings. */
+    flows: Array<{ month: string; contributions: string; withdrawals: string }>;
+    /** Executed trades per calendar month (trade date). */
+    trading: Array<{ month: string; trades: number; buyValue: string; sellValue: string }>;
+  } | null;
   /** The signed-in member's own position. */
   me: {
     units: string;
@@ -377,11 +401,18 @@ export async function getDashboard(db: Db, ctx: FundContext): Promise<DashboardD
 
   const me = await memberPosition(db, fundId, ctx.userId, latest, ledger.units);
 
-  const privilegedCounts = await one<{ drafts: number; expenses: number }>(
+  const privilegedCounts = await one<{ drafts: number; expenses: number; approvals: number; joins: number; contributed: string; withdrawn: string }>(
     db,
     `SELECT (SELECT COUNT(*) FROM qfinera_fund_trades WHERE fund_id = $1 AND status = 'DRAFT')::int AS drafts,
-            (SELECT COUNT(*) FROM qfinera_fund_expenses WHERE fund_id = $1 AND status = 'PENDING')::int AS expenses`,
-    [fundId]
+            (SELECT COUNT(*) FROM qfinera_fund_expenses WHERE fund_id = $1 AND status = 'PENDING')::int AS expenses,
+            (SELECT COUNT(*) FROM qfinera_change_requests WHERE fund_id = $1 AND status = 'PENDING'
+               AND ($2::int IS NULL OR requested_by = $2))::int AS approvals,
+            (SELECT COUNT(*) FROM qfinera_fund_join_requests WHERE fund_id = $1 AND status = 'PENDING')::int AS joins,
+            (SELECT COALESCE(SUM(cash_delta), 0)::numeric(20,2)::text FROM qfinera_fund_ledger_entries
+              WHERE fund_id = $1 AND entry_type = 'CONTRIBUTION') AS contributed,
+            (SELECT COALESCE(-SUM(cash_delta), 0)::numeric(20,2)::text FROM qfinera_fund_ledger_entries
+              WHERE fund_id = $1 AND entry_type = 'WITHDRAWAL') AS withdrawn`,
+    [fundId, can(ctx, "requests:review") ? null : ctx.userId]
   );
   const recentActivity = can(ctx, "audit:view")
     ? (await listAudit(db, fundId, {
@@ -396,6 +427,45 @@ export async function getDashboard(db: Db, ctx: FundContext): Promise<DashboardD
       })).rows
     : null;
   const status = await marketStatus(db, fundId);
+
+  let charts: DashboardData["charts"] = null;
+  if (can(ctx, "reports:view")) {
+    const [navRows, flowRows, tradeRows] = await Promise.all([
+      db.query<{ date: string; nav: string; fund_value: string; cash: string; holdings_value: string }>(
+        `SELECT as_of_date::text AS date, nav::text AS nav, fund_value::text AS fund_value, cash::text AS cash,
+                holdings_value::text AS holdings_value
+           FROM (SELECT * FROM qfinera_fund_nav_snapshots WHERE fund_id = $1 AND is_official
+                  ORDER BY as_of_date DESC LIMIT 366) s
+          ORDER BY as_of_date`,
+        [fundId]
+      ),
+      db.query<{ month: string; contributions: string; withdrawals: string }>(
+        `SELECT to_char(date_trunc('month', entry_date), 'YYYY-MM') AS month,
+                COALESCE(SUM(cash_delta) FILTER (WHERE entry_type = 'CONTRIBUTION'), 0)::numeric(20,2)::text AS contributions,
+                COALESCE(-SUM(cash_delta) FILTER (WHERE entry_type = 'WITHDRAWAL'), 0)::numeric(20,2)::text AS withdrawals
+           FROM qfinera_fund_ledger_entries
+          WHERE fund_id = $1 AND entry_type IN ('CONTRIBUTION', 'WITHDRAWAL')
+            AND entry_date >= (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') - interval '11 months')::date
+          GROUP BY 1 ORDER BY 1`,
+        [fundId]
+      ),
+      db.query<{ month: string; trades: number; buy_value: string; sell_value: string }>(
+        `SELECT to_char(date_trunc('month', trade_date), 'YYYY-MM') AS month, COUNT(*)::int AS trades,
+                COALESCE(SUM(quantity * price) FILTER (WHERE side = 'BUY'), 0)::numeric(20,2)::text AS buy_value,
+                COALESCE(SUM(quantity * price) FILTER (WHERE side = 'SELL'), 0)::numeric(20,2)::text AS sell_value
+           FROM qfinera_fund_trades
+          WHERE fund_id = $1 AND status IN ('EXECUTED', 'SETTLED', 'FINALIZED')
+            AND trade_date >= (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') - interval '11 months')::date
+          GROUP BY 1 ORDER BY 1`,
+        [fundId]
+      ),
+    ]);
+    charts = {
+      nav: navRows.rows.map((r) => ({ date: r.date, nav: r.nav, fundValue: r.fund_value, cash: r.cash, holdingsValue: r.holdings_value })),
+      flows: flowRows.rows,
+      trading: tradeRows.rows.map((r) => ({ month: r.month, trades: r.trades, buyValue: r.buy_value, sellValue: r.sell_value })),
+    };
+  }
 
   return {
     officialNav: latest,
@@ -417,7 +487,11 @@ export async function getDashboard(db: Db, ctx: FundContext): Promise<DashboardD
       withdrawals: pendingRow?.withdrawals ?? 0,
       draftTrades: seesDrafts ? (privilegedCounts?.drafts ?? 0) : null,
       expenses: can(ctx, "expenses:view") ? (privilegedCounts?.expenses ?? 0) : null,
+      approvals: can(ctx, "requests:view") ? (privilegedCounts?.approvals ?? 0) : null,
+      joinRequests: can(ctx, "join_requests:review") ? (privilegedCounts?.joins ?? 0) : null,
     },
+    totals: { contributions: privilegedCounts?.contributed ?? "0.00", withdrawals: privilegedCounts?.withdrawn ?? "0.00" },
+    totalPnl: holdings.unrealizedPnl === null ? null : m(holdings.realizedPnl).add(m(holdings.unrealizedPnl)).toDecimalString(2),
     recentActivity,
     market: status ? { state: status.state, reason: status.reason, basis: status.basis } : null,
     recentTrades: trades.map((t) => ({
@@ -446,6 +520,7 @@ export async function getDashboard(db: Db, ctx: FundContext): Promise<DashboardD
       status: w.status,
       createdAt: w.created_at,
     })),
+    charts,
     me,
   };
 }

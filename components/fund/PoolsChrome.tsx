@@ -28,9 +28,9 @@ export function SignInGate({ message, next = "/qfinera/pools" }: { message: stri
   ];
   return (
     <div className="mx-auto max-w-3xl">
-      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--qf-brass-dark)]">QFinera Pools</p>
+      <p className="text-[12px] font-semibold uppercase tracking-[0.12em] text-[var(--qf-brass-dark)]">Pools</p>
       <h1 className="mt-2 font-display text-[30px] font-semibold leading-tight tracking-tight text-[var(--qf-ink)] sm:text-[38px]">
-        Private spaces for groups to organize pooled trading, accounting and portfolio records.
+        Manage a pooled fund with people you know.
       </h1>
       <p className="mt-3 text-[15.5px] leading-relaxed text-[var(--qf-ink-soft)]">{message}</p>
       <div className="mt-6 flex flex-col gap-2 sm:flex-row">
@@ -56,6 +56,12 @@ export function SignInGate({ message, next = "/qfinera/pools" }: { message: stri
           </li>
         ))}
       </ul>
+      <p className="mt-8 text-[14px] text-[var(--qf-ink-soft)]">
+        Want to see how it works first?{" "}
+        <Link href="/qfinera/learn/pool-guide" className="font-semibold text-[var(--qf-brass-dark)] underline-offset-2 hover:underline">
+          Read the Pool Guide
+        </Link>
+      </p>
     </div>
   );
 }

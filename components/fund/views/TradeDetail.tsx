@@ -12,10 +12,10 @@ import { DecimalField, SelectField, TextAreaField, TextField } from "@/component
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog } from "@/components/fund/overlays";
 import { PageHeader, SectionCard, btnPrimary } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
-import { ActionPanel, AuditTrail, DetailGrid, StageTracker, type WorkflowAction } from "@/components/fund/workflow";
+import { APPROVAL_SENT, ActionPanel, ApprovalNotice, AuditTrail, DetailGrid, StageTracker, isPendingApproval, type WorkflowAction } from "@/components/fund/workflow";
 import { SideLabel, ACTION_LABEL, InstrumentPicker, InstrumentSummary, PRODUCT_LABEL, type InstrumentKind } from "@/components/fund/views/shared";
 
 const STAGES = [
@@ -36,6 +36,7 @@ const PRODUCT_KIND: Record<string, InstrumentKind> = { EQUITY_DELIVERY: "EQUITY"
 function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; totalCharges: string; open: boolean; onClose: () => void; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const proposing = useFund().role === "MANAGER";
   const [product, setProduct] = useState(t.product);
   const [action, setAction] = useState(t.position_action);
   const [instrument, setInstrument] = useState<InstrumentDto | null>({
@@ -67,7 +68,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
       onClose={onClose}
       title={`Edit trade #${t.id}`}
       description="Match the contract note. Previous values stay in the revision history and audit trail; positions, cash and P&L are recalculated."
-      submitLabel="Save correction"
+      submitLabel={proposing ? "Send for approval" : "Save correction"}
       pending={pending}
       error={error}
       onSubmit={async () => {
@@ -76,7 +77,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
         if (reason.trim().length < 10) return setError("Give a correction reason of at least 10 characters.");
         if (!isPositiveDecimal(quantity, 4) || !isPositiveDecimal(price, 4)) return setError("Quantity and price must be greater than zero (up to 4 decimals).");
         try {
-          const r = await run<{ adjustments: unknown[]; affectedOfficialNavDates: string[] }>(`trades/${t.id}`, {
+          const r = await run<{ adjustments: unknown[]; affectedOfficialNavDates: string[]; pendingApproval?: true }>(`trades/${t.id}`, {
             action: "correct",
             trade: { instrumentId: instrument.id, product, action, tradeDate, quantity, price, estimatedCharges: estimatedCharges.trim() || "0" },
             settlementDate: settlementDate || undefined,
@@ -87,7 +88,9 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
           });
           notify(
             "success",
-            r.affectedOfficialNavDates.length > 0
+            isPendingApproval(r)
+              ? APPROVAL_SENT
+              : r.affectedOfficialNavDates.length > 0
               ? `Trade corrected. Official NAVs already struck for ${r.affectedOfficialNavDates.join(", ")} were not changed; strike a NAV correction if needed.`
               : `Trade corrected${r.adjustments.length ? `; ${r.adjustments.length} cash adjustment${r.adjustments.length === 1 ? "" : "s"} posted` : ""}.`
           );
@@ -98,6 +101,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
         }
       }}
     >
+      {proposing && <ApprovalNotice />}
       <div className="grid gap-4 sm:grid-cols-2">
         <SelectField
           label="Product"
@@ -191,7 +195,7 @@ function Revisions({ revisions }: { revisions: TradeDetailDto["revisions"] }) {
 }
 
 export function TradeDetail({ id, initialEdit = false }: { id: string; initialEdit?: boolean }) {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId } = useFund();
   const valid = /^\d{1,9}$/.test(id);
   const res = usePoolResource<TradeDetailDto>(valid ? `trades/${id}` : null);
@@ -220,6 +224,7 @@ export function TradeDetail({ id, initialEdit = false }: { id: string; initialEd
         reason: { label: "Reason", min: 10 },
         confirmText: "I confirm this correction.",
         success: "Trade reversed.",
+        approval: true,
       });
     }
   }

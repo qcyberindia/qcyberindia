@@ -220,7 +220,10 @@ suite("pool lifecycle (real database)", () => {
       request(carol, `${base()}/contributions/${bobContribution}`, { body: { action: "approve" } }),
       PI(bobContribution)
     );
-    expect(managerApprove.status).toBe(403);
+    // A MANAGER's approval is only a request for ADMIN approval: nothing changes yet.
+    expect(managerApprove.status).toBe(202);
+    expect((await managerApprove.json()).data.pendingApproval).toBe(true);
+    expect((await db.query("SELECT status FROM qfinera_fund_contributions WHERE id = $1", [bobContribution])).rows[0].status).toBe("PENDING");
 
     for (const action of ["approve", "confirm-funds"]) {
       expect((await contributionRoute.POST(request(alice, `${base()}/contributions/${bobContribution}`, { body: { action } }), PI(bobContribution))).status).toBe(200);
@@ -241,9 +244,10 @@ suite("pool lifecycle (real database)", () => {
     expect(rows[0]).toEqual({ status: "AWAITING_NAV", units_allocated: null });
   });
 
-  it("only ADMIN strikes NAV; the first NAV is the initial 10.0000 and finalizes waiting contributions", async () => {
+  it("only ADMIN strikes NAV (a MANAGER's strike waits for approval); the first NAV is the initial 10.0000 and finalizes waiting contributions", async () => {
     await setNavDate("qfinera_fund_contributions", bobContribution, "2026-09-01");
-    expect((await strike("2026-09-01", carol)).status).toBe(403);
+    expect((await strike("2026-09-01", carol)).status).toBe(202);
+    expect((await db.query("SELECT COUNT(*)::int AS n FROM qfinera_fund_nav_snapshots WHERE fund_id = $1", [poolId])).rows[0].n).toBe(0);
     expect((await strike("2026-09-05")).status).toBe(409); // Saturday: not a trading day
     expect((await strike("2999-01-01")).status).toBe(400); // future
 
@@ -473,7 +477,8 @@ suite("pool lifecycle (real database)", () => {
     );
     expect(e.status).toBe(201);
     const byManager = await expenseRoute.POST(request(carol, `${base()}/expenses/${e.body.data.expense.id}`, { body: { action: "approve" } }), PI(e.body.data.expense.id));
-    expect(byManager.status).toBe(403);
+    expect(byManager.status).toBe(202); // pending ADMIN approval; the expense stays PENDING
+    expect((await db.query("SELECT status FROM qfinera_fund_expenses WHERE id = $1", [e.body.data.expense.id])).rows[0].status).toBe("PENDING");
     expect((await expenseRoute.POST(request(alice, `${base()}/expenses/${e.body.data.expense.id}`, { body: { action: "approve" } }), PI(e.body.data.expense.id))).status).toBe(200);
     const after = await db.query("SELECT SUM(units_delta)::text AS u, SUM(cash_delta)::text AS c FROM qfinera_fund_ledger_entries WHERE fund_id = $1", [poolId]);
     expect(after.rows[0].u).toBe(before.rows[0].u);
@@ -490,12 +495,15 @@ suite("pool lifecycle (real database)", () => {
     expect(r.body.error.code).toBe("INVARIANT");
   });
 
-  it("reversal: ADMIN only, with a reason; refuses a reversal that would oversell", async () => {
+  it("reversal: ADMIN only (a MANAGER's reversal waits for approval), with a reason; refuses a reversal that would oversell", async () => {
     const byManager = await tradeRoute.POST(
       request(carol, `${base()}/trades/${buyId}`, { body: { action: "reverse", reason: "Entered against the wrong pool", confirm: true } }),
       PI(buyId)
     );
-    expect(byManager.status).toBe(403);
+    expect(byManager.status).toBe(202);
+    expect((await db.query("SELECT status FROM qfinera_fund_trades WHERE id = $1", [buyId])).rows[0].status).not.toBe("REVERSED");
+    // Clear the proposal so it cannot interfere with the checks below.
+    await db.query("UPDATE qfinera_change_requests SET status = 'CANCELLED' WHERE fund_id = $1 AND action = 'trade.reverse'", [poolId]);
     // Reversing the first BUY would leave the later SELL overselling.
     const r = await json(
       await tradeRoute.POST(
@@ -545,8 +553,9 @@ suite("pool lifecycle (real database)", () => {
     expect(r.body.data.disclaimer).toBe("ESTIMATE — NOT TAX ADVICE");
   });
 
-  it("audit: ADMIN-only, and the log and ledger cannot be edited or deleted", async () => {
-    expect((await auditRoute.GET(request(carol, `${base()}/audit`), P())).status).toBe(403);
+  it("audit: ADMIN and MANAGER read it, members cannot, and the log and ledger cannot be edited or deleted", async () => {
+    expect((await auditRoute.GET(request(carol, `${base()}/audit`), P())).status).toBe(200);
+    expect((await auditRoute.GET(request(bob, `${base()}/audit`), P())).status).toBe(403);
     const r = await json(await auditRoute.GET(request(alice, `${base()}/audit?entityType=trade`), P()));
     expect(r.body.data.audit.some((a: { action: string }) => a.action === "trade.executed_backdated")).toBe(true);
 
@@ -564,7 +573,9 @@ suite("pool lifecycle (real database)", () => {
     const self = await memberRoute.PATCH(request(alice, `${base()}/members/${alice.id}`, { method: "PATCH", body: { role: "MEMBER" } }), PI(alice.id));
     expect(self.status).toBe(403);
     const byManager = await memberRoute.PATCH(request(carol, `${base()}/members/${bob.id}`, { method: "PATCH", body: { status: "suspended" } }), PI(bob.id));
-    expect(byManager.status).toBe(403);
+    expect(byManager.status).toBe(202); // a request for ADMIN approval; bob is still active
+    expect((await db.query("SELECT status FROM qfinera_fund_memberships WHERE fund_id = $1 AND user_id = $2", [poolId, bob.id])).rows[0].status).toBe("active");
+    await db.query("UPDATE qfinera_change_requests SET status = 'CANCELLED' WHERE fund_id = $1 AND action = 'member.update'", [poolId]);
     const suspend = await memberRoute.PATCH(request(alice, `${base()}/members/${bob.id}`, { method: "PATCH", body: { status: "suspended" } }), PI(bob.id));
     expect(suspend.status).toBe(200);
     expect((await dashboardRoute.GET(request(bob, `${base()}/dashboard`), P())).status).toBe(403);

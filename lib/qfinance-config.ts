@@ -23,8 +23,8 @@ export const qfinanceConfig = {
     (process.env.NODE_ENV === "production"
       ? `https://${siteConfig.domain}`
       : "http://localhost:3000"),
-  tagline: "A New. Financial. Era.",
+  tagline: "Research. Learn. Share. Manage.",
   description:
-    "A private room for investors to discuss, record, research, and manage their own investment thinking.",
+    "Learn how investing works, research companies, share useful findings with other investors, and keep honest records of money you invest together.",
   email: siteConfig.email.info,
 };

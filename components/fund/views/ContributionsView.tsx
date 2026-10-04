@@ -10,7 +10,7 @@ import { recordHref } from "@/components/fund/nav";
 import { useNotice } from "@/components/fund/notices";
 import { Drawer, FormDialog } from "@/components/fund/overlays";
 import { EmptyState, PageHeader, SectionCard, btnPrimary, btnSecondary } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField, Pagination } from "@/components/fund/table";
 import { ProofDropzone, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
@@ -28,7 +28,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
-  const can = useCan();
+  const can = useCanAct();
   const { userId } = useFund();
   const members = usePoolResource<{ members: Member[] }>(open && can("contributions:create_for_member") ? "members" : null);
   const { run, pending } = usePoolMutation();
@@ -156,7 +156,7 @@ function ReviewDrawer({ id, onClose, onChanged }: { id: number | null; onClose: 
 }
 
 export function ContributionsView() {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId } = useFund();
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);

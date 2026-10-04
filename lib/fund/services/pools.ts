@@ -57,7 +57,7 @@ export async function listMyPools(db: Db, userId: number): Promise<PoolSummary[]
          SELECT as_of_date, nav FROM qfinera_fund_nav_snapshots s
           WHERE s.fund_id = f.id AND s.is_official ORDER BY as_of_date DESC LIMIT 1
        ) n ON true
-      WHERE m.user_id = $1 AND m.status <> 'removed'
+      WHERE m.user_id = $1 AND m.status <> 'removed' AND f.deleted_at IS NULL
       ORDER BY f.status, f.name, f.id`,
     [userId]
   );

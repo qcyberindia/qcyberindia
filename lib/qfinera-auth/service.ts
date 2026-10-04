@@ -355,6 +355,17 @@ export async function adminSetUserStatus(userId: number, status: "active" | "sus
   });
 }
 
+/** Global Watch moderation role. Only the QCyberIndia site administrator assigns it. */
+export async function adminSetPlatformRole(userId: number, role: "USER" | "MANAGER" | "ADMIN", reason: string, ip: string | null): Promise<void> {
+  await inTransaction(async (tx) => {
+    const row = await one<{ platform_role: string }>(tx, "SELECT platform_role FROM qfinance_users WHERE id = $1 FOR UPDATE", [userId]);
+    if (!row) throw new FundError("NOT_FOUND", "User not found.", 404);
+    if (row.platform_role === role) throw new FundError("CONFLICT", `The account already has the ${role} role.`, 409);
+    await tx.query("UPDATE qfinance_users SET platform_role = $2, updated_at = now() WHERE id = $1", [userId, role]);
+    await adminAudit(tx, userId, "user.platform_role_changed", { reason, from: row.platform_role, to: role }, ip);
+  });
+}
+
 export async function adminRevokeSessions(userId: number, reason: string, ip: string | null): Promise<number> {
   return inTransaction(async (tx) => {
     const exists = await one<{ id: number }>(tx, "SELECT id FROM qfinance_users WHERE id = $1", [userId]);

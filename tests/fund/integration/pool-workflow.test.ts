@@ -141,7 +141,7 @@ suite("pool workflow: contribution review and trade corrections (real database)"
     expect(list.body.data.contributions[0]).toMatchObject({ id: bobContribution, proofCount: 1, paymentMethod: "UPI" });
 
     expect((await step(bob, bobContribution, "approve")).status).toBe(403);
-    expect((await step(carol, bobContribution, "approve")).status).toBe(403);
+    expect((await step(carol, bobContribution, "approve")).status).toBe(202); // a request for ADMIN approval
     expect((await step(alice, bobContribution, "confirm-funds")).status).toBe(409); // must be approved first
     expect((await step(alice, bobContribution, "approve")).status).toBe(200);
     const confirmed = await step(alice, bobContribution, "confirm-funds");
@@ -256,10 +256,12 @@ suite("pool workflow: contribution review and trade corrections (real database)"
 
   let buy = 0;
 
-  it("only an admin corrects an executed trade, with a reason", async () => {
+  it("only an admin corrects an executed trade (a manager's correction waits for approval), with a reason", async () => {
     buy = (await trade(carol, { instrumentId: infy, product: "EQUITY_DELIVERY", action: "OPEN_LONG", quantity: "10", price: "1500", estimatedCharges: "20.00" })).body.data.trade.id;
     const body = { trade: { instrumentId: infy, product: "EQUITY_DELIVERY", action: "OPEN_LONG", tradeDate: "2026-09-02", quantity: "12", price: "1500", estimatedCharges: "20.00" }, reason: "Contract note shows 12 shares" };
-    expect((await correct(carol, buy, body)).status).toBe(403);
+    expect((await correct(carol, buy, body)).status).toBe(202);
+    expect((await db.query("SELECT quantity::text AS q FROM qfinera_fund_trades WHERE id = $1", [buy])).rows[0].q).toBe("10.0000");
+    await db.query("UPDATE qfinera_change_requests SET status = 'CANCELLED' WHERE action = 'trade.correct' AND entity_id = $1", [buy]);
     expect((await correct(bob, buy, body)).status).toBe(403);
     expect((await correct(alice, buy, { ...body, reason: "typo" })).status).toBe(400);
     expect((await correct(mallory, buy, body, poolB)).status).toBe(404); // another pool's trade

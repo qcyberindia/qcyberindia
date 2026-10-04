@@ -7,7 +7,7 @@ import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/compo
 import { humanize } from "@/components/fund/format";
 import { poolBase } from "@/components/fund/nav";
 import { PageHeader, SectionCard } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import { useCanAct, useFund } from "@/components/fund/session";
 import { usePoolResource } from "@/components/fund/useResource";
 import { ActionPanel, AuditTrail, DetailGrid, StageTracker, type WorkflowAction } from "@/components/fund/workflow";
 
@@ -18,7 +18,7 @@ const STAGES = [
 ];
 
 export function WithdrawalDetail({ id }: { id: string }) {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId, userId } = useFund();
   const valid = /^\d{1,9}$/.test(id);
   const res = usePoolResource<WithdrawalDetailDto>(valid ? `withdrawals/${id}` : null);
@@ -37,15 +37,16 @@ export function WithdrawalDetail({ id }: { id: string }) {
           "This fixes the NAV date (the next end-of-day NAV after now, by the cutoff time). Units are redeemed when that NAV is struck. If the pool lacks cash then, the request waits.",
         charges: true,
         success: "Withdrawal approved; waiting for the NAV.",
+        approval: true,
       });
-      actions.push({ key: "reject", label: "Reject", variant: "danger", title: "Reject this withdrawal?", consequences: "The request is closed. No units are redeemed.", reason: { label: "Reason", min: 3 }, success: "Withdrawal rejected." });
+      actions.push({ key: "reject", label: "Reject", variant: "danger", title: "Reject this withdrawal?", consequences: "The request is closed. No units are redeemed.", reason: { label: "Reason", min: 3 }, success: "Withdrawal rejected.", approval: true });
     }
     if (w.status === "AWAITING_NAV" && d?.awaiting?.navOfficial && can("nav:finalize")) {
-      actions.push({ key: "finalize", label: "Redeem now", title: "Finalize at the official NAV?", consequences: `Units are redeemed at the official NAV of ${d.awaiting.navDate}. This cannot be undone.`, success: "Withdrawal finalized." });
+      actions.push({ key: "finalize", label: "Redeem now", title: "Finalize at the official NAV?", consequences: `Units are redeemed at the official NAV of ${d.awaiting.navDate}. This cannot be undone.`, success: "Withdrawal finalized.", approval: true });
     }
     const own = w.member_id === userId && w.status === "REQUESTED";
     if (own || (["REQUESTED", "AWAITING_NAV"].includes(w.status) && can("withdrawals:approve"))) {
-      actions.push({ key: "cancel", label: "Cancel request", variant: "secondary", title: "Cancel this withdrawal?", consequences: "The request is closed. No units are redeemed.", reason: { label: "Reason", min: 3, optional: own }, success: "Withdrawal cancelled." });
+      actions.push({ key: "cancel", label: "Cancel request", variant: "secondary", title: "Cancel this withdrawal?", consequences: "The request is closed. No units are redeemed.", reason: { label: "Reason", min: 3, optional: own }, success: "Withdrawal cancelled.", approval: !own });
     }
   }
 

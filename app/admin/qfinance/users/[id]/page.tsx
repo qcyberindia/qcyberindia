@@ -7,7 +7,7 @@ import AdminLoadingState from "@/components/admin/AdminLoadingState";
 type Detail = {
   user: {
     id: number; displayName: string; email: string; status: string; createdAt: string; lastLoginAt: string | null;
-    emailVerifiedAt: string | null; passwordUpdatedAt: string | null; hasPassword: boolean;
+    emailVerifiedAt: string | null; passwordUpdatedAt: string | null; hasPassword: boolean; platformRole: string;
   };
   memberships: Array<{ poolId: number; poolName: string; role: string; status: string; joinedAt: string }>;
   sessions: Array<{ id: number; createdAt: string; lastSeenAt: string; expiresAt: string; userAgent: string | null }>;
@@ -39,7 +39,7 @@ export default function AdminQFineraUserPage({ params }: { params: Promise<{ id:
     };
   }, [id]);
 
-  async function act(action: string, success: string) {
+  async function act(action: string, success: string, extra: Record<string, unknown> = {}) {
     setBusy(true);
     setError("");
     setNotice("");
@@ -47,7 +47,7 @@ export default function AdminQFineraUserPage({ params }: { params: Promise<{ id:
       const r = await fetch(`/api/admin/qfinance/users/${encodeURIComponent(id)}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, reason }),
+        body: JSON.stringify({ action, reason, ...extra }),
       });
       const j = await r.json();
       if (!j.ok) setError(j.error?.message ?? "Action failed");
@@ -84,6 +84,7 @@ export default function AdminQFineraUserPage({ params }: { params: Promise<{ id:
               ["Password", data.user.hasPassword ? `Set (changed ${date(data.user.passwordUpdatedAt)})` : "Not set (email-link account)"],
               ["Community", `${data.community.posts} posts, ${data.community.replies} replies`],
               ["Active sessions", String(data.sessions.length)],
+              ["Global Watch role", data.user.platformRole === "USER" ? "Member" : data.user.platformRole === "MANAGER" ? "Moderator (manager)" : "Administrator"],
             ].map(([k, v]) => (
               <div key={k}>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-fog)]">{k}</dt>
@@ -106,6 +107,25 @@ export default function AdminQFineraUserPage({ params }: { params: Promise<{ id:
               )}
               <button type="button" className={btn} disabled={busy || needsReason} onClick={() => act("revoke-sessions", "All sessions signed out.")}>Sign out everywhere</button>
               <button type="button" className={btn} disabled={busy || data.user.status !== "active"} onClick={() => act("send-password-reset", "A password reset link was emailed to the user.")}>Send password reset</button>
+            </div>
+            <div className="mt-5 border-t border-[var(--color-line)] pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--color-fog)]">Global Watch moderation (reason required)</p>
+              <p className="mt-1 text-sm text-[var(--color-fog)]">
+                Managers archive anyone&apos;s item; their edits and deletions of others&apos; items wait for an administrator. Administrators can do everything.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {(["USER", "MANAGER", "ADMIN"] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    className={btn}
+                    disabled={busy || needsReason || data.user.platformRole === r}
+                    onClick={() => act("set-platform-role", "Global Watch role updated.", { platformRole: r })}
+                  >
+                    {r === "USER" ? "Member" : r === "MANAGER" ? "Make moderator" : "Make administrator"}
+                  </button>
+                ))}
+              </div>
             </div>
           </section>
 

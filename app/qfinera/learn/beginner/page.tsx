@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import QFinanceFooter from "@/components/qfinance/QFinanceFooter";
 import JourneyTimeline from "@/components/qfinance/learning/JourneyTimeline";
@@ -19,7 +20,7 @@ export default function BeginnerJourneyMapPage() {
       <QFinanceHeader />
 
       {/* Beginner Journey introduction */}
-      <section className="border-b border-[var(--qf-line)] px-6 py-12 pb-10 sm:py-14 sm:pb-12">
+      <section className="border-b border-[var(--qf-line)] px-4 py-12 pb-10 sm:px-6 sm:py-14 sm:pb-12">
         <div className="mx-auto max-w-2xl text-center">
           <Reveal>
             <p className="text-sm font-semibold uppercase tracking-[0.1em] text-[var(--qf-brass-dark)]">
@@ -102,6 +103,19 @@ export default function BeginnerJourneyMapPage() {
           <Reveal>
             <JourneyTimeline chapters={chapters} />
           </Reveal>
+        </div>
+      </section>
+
+      <section aria-label="Keep going" className="px-4 pb-14 sm:px-6">
+        <div className="mx-auto grid max-w-xl gap-3 sm:grid-cols-2">
+          <Link href="/qfinera/community" className="rounded-xl border border-[var(--qf-line)] p-4 transition-colors hover:border-[var(--qf-brass)]">
+            <span className="block font-display text-[15px] font-semibold text-[var(--qf-ink)]">Have a question?</span>
+            <span className="mt-0.5 block text-[13.5px] text-[var(--qf-brass-dark)]">Join Community</span>
+          </Link>
+          <Link href="/qfinera/learn/pool-guide" className="rounded-xl border border-[var(--qf-line)] p-4 transition-colors hover:border-[var(--qf-brass)]">
+            <span className="block font-display text-[15px] font-semibold text-[var(--qf-ink)]">Investing with others?</span>
+            <span className="mt-0.5 block text-[13.5px] text-[var(--qf-brass-dark)]">Read the Pool Guide</span>
+          </Link>
         </div>
       </section>
 

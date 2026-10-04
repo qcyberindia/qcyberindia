@@ -4,12 +4,12 @@ import { readDb } from "@/lib/fund/db";
 import { jsonOk } from "@/lib/fund/http";
 import { poolRoute, type PoolParams } from "@/lib/fund/pool-http";
 import { INVITE_TTL_DAYS } from "@/lib/fund/product-gate";
-import type { FundRole } from "@/lib/fund/rbac";
+import { FUND_ROLES, type FundRole } from "@/lib/fund/rbac";
 import { createInvite, listInvites } from "@/lib/fund/services/invites";
 import { parseEmail, parseEnum, readJsonObject } from "@/lib/fund/validation";
 import { qfinanceConfig } from "@/lib/qfinance-config";
 
-const ROLES: readonly FundRole[] = ["ADMIN", "MANAGER", "MEMBER"];
+const ROLES: readonly FundRole[] = FUND_ROLES;
 
 export async function GET(req: NextRequest, { params }: PoolParams) {
   return poolRoute(req, params, async ({ sctx }) => jsonOk({ invites: await listInvites(readDb(), sctx) }));

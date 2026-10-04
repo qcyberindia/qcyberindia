@@ -50,3 +50,15 @@ export function serviceCtx(ctx: FundContext, req: Request): ServiceCtx {
 
 /** Route params arrive as a Promise in Next.js 16. */
 export type IdParams = { params: Promise<{ id: string }> };
+
+/**
+ * Response for an ADMIN-only change made through actOrPropose(): the
+ * result when it was applied, or 202 + the pending request when a MANAGER
+ * proposed it (nothing has changed yet).
+ */
+export function actionResponse(
+  r: { kind: "done"; data: unknown } | { kind: "proposed"; request: unknown },
+  status = 200
+) {
+  return r.kind === "proposed" ? jsonOk({ pendingApproval: true as const, request: r.request }, 202) : jsonOk(r.data, status);
+}

@@ -9,10 +9,11 @@ import { SelectField, TextField, inputClass } from "@/components/fund/forms";
 import { humanize } from "@/components/fund/format";
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog, Modal } from "@/components/fund/overlays";
-import { EmptyState, PageHeader, SectionCard, btnPrimary, btnSecondary } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import { EmptyState, PageHeader, SectionCard, btnDanger, btnPrimary, btnSecondary } from "@/components/fund/parts";
+import { useAuthority, useCan, useCanAct, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
+import { APPROVAL_SENT, ApprovalNotice, isPendingApproval } from "@/components/fund/workflow";
 
 function InviteDialog({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
   const { role } = useFund();
@@ -80,26 +81,49 @@ function InviteDialog({ open, onClose, onDone }: { open: boolean; onClose: () =>
         label="Role"
         value={inviteRole}
         onChange={setInviteRole}
-        options={(role === "ADMIN" ? ["MEMBER", "MANAGER", "ADMIN"] : ["MEMBER"]).map((r) => ({ value: r, label: humanize(r) }))}
-        hint="Managers record trades and expenses; administrators approve money movements and manage the pool."
+        options={(role === "ADMIN" ? ["VIEWER", "MEMBER", "MANAGER", "ADMIN"] : ["VIEWER", "MEMBER"]).map((r) => ({ value: r, label: ROLE_INFO[r].label }))}
+        hint={ROLE_INFO[inviteRole]?.summary}
       />
     </FormDialog>
   );
 }
 
+export const ROLE_INFO: Record<string, { label: string; summary: string }> = {
+  VIEWER: { label: "Viewer", summary: "Read-only. Sees the pool and their own records; can ask to become a member." },
+  MEMBER: { label: "Member", summary: "Contributes, withdraws, comments and adds watchlist notes." },
+  MANAGER: { label: "Manager", summary: "Runs the pool day to day. Approval-level changes go to an administrator." },
+  ADMIN: { label: "Admin", summary: "Full control, including approvals, roles, settings and deleting the pool." },
+};
+const ROLE_ORDER = ["VIEWER", "MEMBER", "MANAGER", "ADMIN"] as const;
+const rank = (r: string) => ROLE_ORDER.indexOf(r as (typeof ROLE_ORDER)[number]);
+
+type MemberChange = { body: Record<string, unknown>; title: string; summary: string; success: string; highRisk: boolean };
+
 function MemberAdminDialog({ member, onClose, onDone }: { member: Member | null; onClose: () => void; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
+  const proposing = useAuthority()("members:change_role") === "propose";
   const [role, setRole] = useState(member?.role ?? "MEMBER");
+  const [change, setChange] = useState<MemberChange | null>(null);
   const [reason, setReason] = useState("");
+  const [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function send(body: Record<string, unknown>, success: string) {
-    if (!member) return;
+  if (!member) return null;
+  const from = ROLE_INFO[member.role]?.label ?? humanize(member.role);
+
+  function review(next: MemberChange) {
+    setError(null);
+    setConfirmed(false);
+    setChange(next);
+  }
+
+  async function submit() {
+    if (!change) return;
     setError(null);
     try {
-      await run(`members/${member.userId}`, { ...body, reason: reason.trim() || undefined }, "PATCH");
-      notify("success", success);
+      const result = await run(`members/${member!.userId}`, { ...change.body, reason: reason.trim() || undefined }, "PATCH");
+      notify("success", isPendingApproval(result) ? APPROVAL_SENT : change.success);
       onDone();
       onClose();
     } catch (err) {
@@ -107,50 +131,136 @@ function MemberAdminDialog({ member, onClose, onDone }: { member: Member | null;
     }
   }
 
+  const roleChange = (): MemberChange => {
+    const to = ROLE_INFO[role]?.label ?? humanize(role);
+    const promotion = rank(role) > rank(member.role);
+    return {
+      body: { role },
+      title: `${promotion ? "Promote" : "Change"} ${member.name} from ${from} to ${to}?`,
+      summary: `${to}: ${ROLE_INFO[role]?.summary ?? ""}${role === "VIEWER" && member.units !== "0.0000" ? " Their units stay theirs; an administrator can still process withdrawals for them." : ""}`,
+      success: `${member.name} is now ${to === "Admin" ? "an" : "a"} ${to}.`,
+      highRisk: role === "ADMIN" || role === "MANAGER",
+    };
+  };
+
   return (
-    <Modal open={member !== null} onClose={onClose} title={member ? `Manage ${member.name}` : ""}>
-      {member && (
-        <div className="space-y-4 px-5 py-4 text-[14px]">
-          <SelectField
-            label="Role"
-            value={role}
-            onChange={setRole}
-            options={["MEMBER", "MANAGER", "ADMIN"].map((r) => ({ value: r, label: humanize(r) }))}
-          />
-          <TextField label="Reason (recorded in the audit log)" value={reason} onChange={setReason} maxLength={500} />
-          {error && (
-            <p role="alert" className="rounded-md border border-[var(--qf-down)]/30 bg-[var(--qf-down)]/10 px-3 py-2 text-[13px] text-[var(--qf-down)]">
-              {error}
-            </p>
-          )}
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={btnPrimary} disabled={pending || role === member.role} onClick={() => void send({ role }, "Role updated.")}>
-              Save role
+    <Modal open onClose={onClose} title={change ? "Confirm the change" : `Manage ${member.name}`} description={change ? undefined : `Currently ${from}, ${member.status}.`}>
+      <div className="space-y-4 px-5 py-4 text-[14px]">
+        {change ? (
+          <>
+            {proposing && <ApprovalNotice />}
+            <div className="rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-3 py-3">
+              <p className="font-display text-[16px] font-semibold text-[var(--qf-ink)]">{change.title}</p>
+              <p className="mt-1 text-[13px] text-[var(--qf-ink-soft)]">{change.summary}</p>
+            </div>
+            <TextField label="Reason (recorded in the audit log)" value={reason} onChange={setReason} maxLength={500} />
+            {change.highRisk && (
+              <label className="flex items-start gap-2 text-[13px]">
+                <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5 h-4 w-4" />
+                I understand this {change.body.status === "removed" ? "removes their access to the pool" : "gives them more control over the pool"}.
+              </label>
+            )}
+          </>
+        ) : (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Role</legend>
+            {ROLE_ORDER.map((r) => (
+              <label
+                key={r}
+                className={`flex cursor-pointer items-start gap-3 rounded-md border px-3 py-2.5 transition-colors ${
+                  role === r ? "border-[var(--qf-brass)] bg-[var(--qf-brass)]/5" : "border-[var(--qf-line)] hover:border-[var(--qf-brass)]/60"
+                }`}
+              >
+                <input type="radio" name="member-role" value={r} checked={role === r} onChange={() => setRole(r)} className="mt-1 h-4 w-4" />
+                <span>
+                  <span className="font-semibold text-[var(--qf-ink)]">
+                    {ROLE_INFO[r].label}
+                    {r === member.role && <span className="ml-2 text-[12px] font-normal text-[var(--qf-ink-soft)]">current</span>}
+                  </span>
+                  <span className="block text-[12.5px] leading-snug text-[var(--qf-ink-soft)]">{ROLE_INFO[r].summary}</span>
+                </span>
+              </label>
+            ))}
+          </fieldset>
+        )}
+        {error && (
+          <p role="alert" className="rounded-md border border-[var(--qf-down)]/30 bg-[var(--qf-down)]/10 px-3 py-2 text-[13px] text-[var(--qf-down)]">
+            {error}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col-reverse gap-2 border-t border-[var(--qf-line)] px-5 py-3 sm:flex-row sm:flex-wrap sm:justify-end">
+        {change ? (
+          <>
+            <button type="button" className={btnSecondary} disabled={pending} onClick={() => setChange(null)}>
+              Back
+            </button>
+            <button
+              type="button"
+              className={change.body.status === "removed" ? btnDanger : btnPrimary}
+              disabled={pending || (change.highRisk && !confirmed)}
+              onClick={() => void submit()}
+            >
+              {pending ? "Working…" : proposing ? "Send for approval" : "Confirm"}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={btnSecondary}
+              onClick={() =>
+                review({
+                  body: { status: "removed" },
+                  title: `Remove ${member.name} from the pool?`,
+                  summary: "Needs zero units and no open requests. Their history is kept, and they can be invited again later.",
+                  success: "Member removed.",
+                  highRisk: true,
+                })
+              }
+            >
+              Remove
             </button>
             {member.status === "active" ? (
-              <button type="button" className={btnSecondary} disabled={pending} onClick={() => void send({ status: "suspended" }, "Member suspended.")}>
-                Suspend access
+              <button
+                type="button"
+                className={btnSecondary}
+                onClick={() =>
+                  review({
+                    body: { status: "suspended" },
+                    title: `Suspend ${member.name}?`,
+                    summary: "They lose access to the pool until reactivated. Their units and history are untouched.",
+                    success: "Member suspended.",
+                    highRisk: false,
+                  })
+                }
+              >
+                Suspend
               </button>
             ) : (
-              <button type="button" className={btnSecondary} disabled={pending} onClick={() => void send({ status: "active" }, "Member reactivated.")}>
+              <button
+                type="button"
+                className={btnSecondary}
+                onClick={() =>
+                  review({ body: { status: "active" }, title: `Reactivate ${member.name}?`, summary: "They regain access with their current role.", success: "Member reactivated.", highRisk: false })
+                }
+              >
                 Reactivate
               </button>
             )}
-            <button type="button" className={btnSecondary} disabled={pending} onClick={() => void send({ status: "removed" }, "Member removed.")}>
-              Remove from pool
+            <button type="button" className={btnPrimary} disabled={role === member.role} onClick={() => review(roleChange())}>
+              Review role change
             </button>
-          </div>
-          <p className="text-[12.5px] text-[var(--qf-ink-soft)]">
-            Suspension blocks access but keeps units. Removal needs zero units and no open requests; their history is kept.
-          </p>
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </Modal>
   );
 }
 
 export function MembersView() {
   const can = useCan();
+  const canAct = useCanAct();
   const { userId } = useFund();
   const [showRemoved, setShowRemoved] = useState(false);
   const members = usePoolResource<{ members: Member[] }>("members", { removed: showRemoved ? 1 : null });
@@ -203,7 +313,7 @@ export function MembersView() {
                     </span>
                   ),
                 },
-                { key: "r", header: "Role", cell: (r) => humanize(r.role) },
+                { key: "r", header: "Role", cell: (r) => ROLE_INFO[r.role]?.label ?? humanize(r.role) },
                 { key: "s", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
                 { key: "j", header: "Joined", cell: (r) => <DateDisplay value={r.joinedAt} /> },
                 { key: "i", header: "Contributed", align: "right", cell: (r) => <MoneyDisplay value={r.invested} /> },
@@ -212,7 +322,7 @@ export function MembersView() {
                 { key: "o", header: "Ownership", align: "right", cell: (r) => <PercentDisplay value={r.ownershipPercent} /> },
               ]}
               rowAction={
-                can("members:change_role")
+                canAct("members:change_role")
                   ? (r) =>
                       r.userId !== userId && r.status !== "removed" ? (
                         <button type="button" className="text-[13px] font-semibold text-[var(--qf-brass-dark)] underline" onClick={() => setManaging(r)}>
@@ -238,7 +348,7 @@ export function MembersView() {
                 rowKey={(r) => r.id}
                 columns={[
                   { key: "e", header: "Email", primary: true, cell: (r) => r.email },
-                  { key: "r", header: "Role", cell: (r) => humanize(r.role) },
+                  { key: "r", header: "Role", cell: (r) => ROLE_INFO[r.role]?.label ?? humanize(r.role) },
                   { key: "s", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
                   { key: "c", header: "Sent", cell: (r) => <DateDisplay value={r.createdAt} /> },
                   { key: "x", header: "Expires", cell: (r) => <DateDisplay value={r.expiresAt} /> },

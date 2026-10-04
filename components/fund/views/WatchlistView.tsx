@@ -88,7 +88,7 @@ export function WatchlistView() {
         title="Watchlist"
         description="The pool's shared research notes and discussion."
         actions={
-          can("watchlist:write") ? (
+          can("watchlist:write") || can("watchlist:create") ? (
             <button type="button" className={btnPrimary} onClick={() => setCreating(true)}>
               <Plus size={16} aria-hidden="true" /> Add instrument
             </button>
@@ -149,7 +149,7 @@ export function WatchlistView() {
             />
           ))}
       </SectionCard>
-      {can("watchlist:write") && <NewItem key={String(creating)} open={creating} onClose={() => setCreating(false)} onDone={res.reload} />}
+      {(can("watchlist:write") || can("watchlist:create")) && <NewItem key={String(creating)} open={creating} onClose={() => setCreating(false)} onDone={res.reload} />}
     </>
   );
 }

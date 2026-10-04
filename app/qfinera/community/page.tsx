@@ -30,11 +30,11 @@ export default async function CommunityPage({
     <div>
       <QFinanceHeader />
 
-      <main className="mx-auto max-w-4xl px-6 py-14">
+      <main id="main" className="mx-auto max-w-4xl px-4 py-12 sm:px-6 sm:py-14">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">
           Community
         </p>
-        <h1 className="mt-2 font-display text-3xl font-bold tracking-tight text-[var(--qf-ink)] sm:text-4xl">
+        <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight text-[var(--qf-ink)] sm:text-4xl">
           Ask before you invest.
         </h1>
         <p className="mt-3 max-w-xl text-[15px] leading-relaxed text-[var(--qf-ink-soft)]">
@@ -56,15 +56,7 @@ export default async function CommunityPage({
 
         <div className="mt-6 space-y-3">
           {posts.length > 0 && !category && (
-            <div className="flex items-center gap-2">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full motion-safe:animate-ping rounded-full bg-[var(--qf-brass)] opacity-60" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--qf-brass)]" />
-              </span>
-              <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--qf-brass-dark)]">
-                Live Today
-              </p>
-            </div>
+            <h2 className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--qf-brass-dark)]">Latest questions</h2>
           )}
           {posts.length === 0 ? (
             <div className="rounded-md border border-dashed border-[var(--qf-line)] p-10 text-center">
@@ -111,22 +103,22 @@ export default async function CommunityPage({
 
         <div className="mt-16 grid gap-4 border-t border-[var(--qf-line)] pt-10 sm:grid-cols-2">
           <Link
-            href="/qfinera/learn/beginner"
+            href="/qfinera/learn"
             className="group rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-colors hover:border-[var(--qf-brass)]"
           >
-            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Not sure where to start?</p>
+            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Want to learn the concept first?</p>
             <p className="mt-1 flex items-center gap-1 text-[13.5px] font-medium text-[var(--qf-brass-dark)]">
-              Start the Beginner Journey
+              Go to Learn
               <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
             </p>
           </Link>
           <Link
-            href="/qfinera/beta"
+            href="/qfinera/watch"
             className="group rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)] p-5 transition-colors hover:border-[var(--qf-brass)]"
           >
-            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Want to help shape QFinera?</p>
+            <p className="font-display text-[15px] font-semibold text-[var(--qf-ink)]">Seen something worth sharing?</p>
             <p className="mt-1 flex items-center gap-1 text-[13.5px] font-medium text-[var(--qf-brass-dark)]">
-              Join QFinera
+              Post it to Global Watch
               <ArrowRight size={13} className="transition-transform group-hover:translate-x-0.5" />
             </p>
           </Link>

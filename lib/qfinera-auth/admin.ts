@@ -54,10 +54,10 @@ export async function adminGetUser(id: number) {
   const db = readDb();
   const user = await one<{
     id: number; display_name: string; email: string; status: string; created_at: Date; last_login_at: Date | null;
-    email_verified_at: Date | null; password_updated_at: Date | null; has_password: boolean;
+    email_verified_at: Date | null; password_updated_at: Date | null; has_password: boolean; platform_role: string;
   }>(
     db,
-    `SELECT id, display_name, email, status, created_at, last_login_at, email_verified_at, password_updated_at,
+    `SELECT id, display_name, email, status, created_at, last_login_at, email_verified_at, password_updated_at, platform_role,
             (password_hash IS NOT NULL) AS has_password
        FROM qfinance_users WHERE id = $1`,
     [id]
@@ -96,6 +96,7 @@ export async function adminGetUser(id: number) {
       emailVerifiedAt: user.email_verified_at,
       passwordUpdatedAt: user.password_updated_at,
       hasPassword: user.has_password,
+      platformRole: user.platform_role,
     },
     memberships: memberships.rows.map((m) => ({ poolId: m.fund_id, poolName: m.name, role: m.role, status: m.status, joinedAt: m.joined_at })),
     sessions: sessions.rows.map((s) => ({ id: Number(s.id), createdAt: s.created_at, lastSeenAt: s.last_seen_at, expiresAt: s.expires_at, userAgent: s.user_agent })),

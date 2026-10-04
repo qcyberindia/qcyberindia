@@ -4,22 +4,22 @@
 // header carries the sections). Large touch targets; safe-area aware.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BookOpen, Home, Layers, MessagesSquare, UserRound } from "lucide-react";
+import { BookOpen, Eye, FlaskConical, Layers, MessagesSquare } from "lucide-react";
 import { isActive } from "./qfinera-nav";
-import { useQFineraUser } from "./useQFineraUser";
+
+// The five product sections. Home is the logo in the header; the account
+// and sign-in live in the header on every screen size.
+const TABS = [
+  { href: "/qfinera/learn", label: "Learn", icon: BookOpen, match: ["/qfinera/learn", "/qfinera/beginner"] },
+  { href: "/qfinera/research", label: "Research", icon: FlaskConical, match: ["/qfinera/research", "/qfinera/why-india-investing"] },
+  { href: "/qfinera/watch", label: "Watch", icon: Eye, match: ["/qfinera/watch"] },
+  { href: "/qfinera/community", label: "Community", icon: MessagesSquare, match: ["/qfinera/community"] },
+  { href: "/qfinera/pools", label: "Pools", icon: Layers, match: ["/qfinera/pools"] },
+] as const;
 
 export default function QFineraTabBar() {
   const pathname = usePathname();
-  const { user } = useQFineraUser();
-  const tabs = [
-    { href: "/qfinera", label: "Home", icon: Home, match: ["/qfinera"], exact: true },
-    { href: "/qfinera/learn/beginner", label: "Learn", icon: BookOpen, match: ["/qfinera/learn", "/qfinera/beginner", "/qfinera/research", "/qfinera/why-india-investing"] },
-    { href: "/qfinera/community", label: "Community", icon: MessagesSquare, match: ["/qfinera/community"] },
-    { href: "/qfinera/pools", label: "Pools", icon: Layers, match: ["/qfinera/pools"] },
-    user
-      ? { href: "/qfinera/account", label: "Account", icon: UserRound, match: ["/qfinera/account"] }
-      : { href: "/qfinera/login", label: "Sign in", icon: UserRound, match: ["/qfinera/login", "/qfinera/register", "/qfinera/forgot-password", "/qfinera/reset-password", "/qfinera/verify-email"] },
-  ];
+  const tabs = TABS;
   return (
     <nav
       aria-label="QFinera sections"
@@ -27,7 +27,7 @@ export default function QFineraTabBar() {
     >
       <ul className="grid grid-cols-5">
         {tabs.map((t) => {
-          const active = "exact" in t && t.exact ? pathname === t.href : isActive(pathname, t);
+          const active = isActive(pathname, t);
           const Icon = t.icon;
           return (
             <li key={t.href}>

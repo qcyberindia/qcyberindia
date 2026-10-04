@@ -15,6 +15,10 @@ import type { FundSettingsView } from "@/lib/fund/services/settings";
 import type { NavPreview, NavSnapshotRow, StrikeResult } from "@/lib/fund/services/nav";
 import type { DailyReport, StatementReport, positionsReport } from "@/lib/fund/services/reports";
 import type { Quote } from "@/lib/market-data";
+import type { ChangeRequest } from "@/lib/fund/change-request-store";
+import type { JoinRequest } from "@/lib/fund/services/join-requests";
+import type { DeletedPool } from "@/lib/fund/services/pool-deletion";
+import type { WatchAttachment, WatchItem as GlobalWatchItem, WatchItemDetail } from "@/lib/watch/service";
 
 /** What a server type looks like after JSON.stringify / JSON.parse. */
 export type Jsonify<T> = T extends Date
@@ -54,6 +58,12 @@ export type Statement = Jsonify<StatementReport>;
 export type PositionsReportDto = Jsonify<Awaited<ReturnType<typeof positionsReport>>>;
 export type Audit = Jsonify<AuditRecord>;
 export type QuoteDto = Quote;
+export type ChangeRequestDto = Jsonify<ChangeRequest> & { label: string };
+export type JoinRequestDto = Jsonify<JoinRequest>;
+export type DeletedPoolDto = Jsonify<DeletedPool>;
+export type WatchItemDto = Jsonify<GlobalWatchItem>;
+export type WatchItemDetailDto = Jsonify<WatchItemDetail>;
+export type WatchAttachmentDto = Jsonify<WatchAttachment>;
 
 export type Paged<K extends string, T> = { [P in K]: T[] } & { page: number; pageSize: number; total: number };
 

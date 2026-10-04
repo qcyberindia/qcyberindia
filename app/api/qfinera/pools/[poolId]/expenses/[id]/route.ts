@@ -1,9 +1,10 @@
 import type { NextRequest } from "next/server";
-import { jsonOk } from "@/lib/fund/http";
+import { actionResponse } from "@/lib/fund/http";
 import { itemId, poolRoute, type PoolItemParams } from "@/lib/fund/pool-http";
-import { approveExpense, rejectExpense } from "@/lib/fund/services/expenses";
-import { parseBackdate, parseEnum, parseText, readJsonObject } from "@/lib/fund/validation";
+import { actOrPropose } from "@/lib/fund/services/change-requests";
+import { parseEnum, readJsonObject } from "@/lib/fund/validation";
 
+/** ADMIN approves or rejects; a MANAGER's decision becomes a request for ADMIN approval. */
 export async function POST(req: NextRequest, { params }: PoolItemParams) {
   return poolRoute(
     req,
@@ -11,12 +12,8 @@ export async function POST(req: NextRequest, { params }: PoolItemParams) {
     async ({ req, sctx, id }) => {
       const body = await readJsonObject(req);
       const eid = itemId(id);
-      switch (parseEnum(body.action, "action", ["approve", "reject"] as const)) {
-        case "approve":
-          return jsonOk({ expense: await approveExpense(sctx, eid, parseBackdate(body)) });
-        case "reject":
-          return jsonOk({ expense: await rejectExpense(sctx, eid, parseText(body.reason, "reason", { min: 3, max: 500 })) });
-      }
+      const action = parseEnum(body.action, "action", ["approve", "reject"] as const);
+      return actionResponse(await actOrPropose(sctx, action === "approve" ? "expense.approve" : "expense.reject", eid, body));
     },
     { mutation: true }
   );

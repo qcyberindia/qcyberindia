@@ -1,17 +1,36 @@
 // "My Pools": server-rendered from the signed-in user's own memberships.
 import Link from "next/link";
-import { ArrowRight, KeyRound, Lock, Mail, Plus, Users } from "lucide-react";
+import { ArrowRight, BookOpen, KeyRound, Lock, Mail, Plus, Users } from "lucide-react";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
 import { humanize } from "@/components/fund/format";
 import { POOLS_BASE, poolBase } from "@/components/fund/nav";
 import { btnPrimary, btnSecondary } from "@/components/fund/parts";
 import type { PoolSummary } from "@/lib/fund/services/pools";
+import type { DeletedPool } from "@/lib/fund/services/pool-deletion";
+import { RestorePoolButton } from "@/components/fund/RestorePoolButton";
 
 type Invite = { poolName: string; role: string; expiresAt: Date };
 
-export function PoolsHome({ pools, invites, welcome }: { pools: PoolSummary[]; invites: Invite[]; welcome: boolean }) {
+export function PoolsHome({
+  pools,
+  invites,
+  welcome,
+  deleted = [],
+  justDeleted = false,
+}: {
+  pools: PoolSummary[];
+  invites: Invite[];
+  welcome: boolean;
+  deleted?: DeletedPool[];
+  justDeleted?: boolean;
+}) {
   return (
     <>
+      {justDeleted && (
+        <p role="status" className="mb-6 rounded-lg border border-[var(--qf-line)] bg-[var(--qf-cream-1)] px-4 py-3 text-[14px] text-[var(--qf-ink)]">
+          The pool was scheduled for deletion. You can restore it below for 30 days.
+        </p>
+      )}
       {welcome && (
         <p role="status" className="mb-6 rounded-lg border border-[var(--qf-fix)]/30 bg-[var(--qf-fix-bg)] px-4 py-3 text-[14px] text-[var(--qf-ink)]">
           Your account is ready. Create a pool, or open an invitation link from your email to join one.
@@ -19,10 +38,13 @@ export function PoolsHome({ pools, invites, welcome }: { pools: PoolSummary[]; i
       )}
       <header className="mb-8 flex flex-col gap-4 border-b border-[var(--qf-line)]/70 pb-6 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">QFinera Pools</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">Pools</p>
           <h1 className="mt-1 font-display text-[30px] font-semibold tracking-tight text-[var(--qf-ink)] sm:text-[38px]">My pools</h1>
           <p className="mt-1 max-w-2xl text-[14.5px] leading-relaxed text-[var(--qf-ink-soft)]">
-            Private spaces for your groups. Each pool keeps its own members, capital, units, NAV, trades and records, visible only to its members.
+            One shared, accurate book for each group you invest with: members, contributions, units, NAV, trades and records.{" "}
+            <Link href="/qfinera/learn/pool-guide" className="font-semibold text-[var(--qf-brass-dark)] underline-offset-2 hover:underline">
+              How pools work
+            </Link>
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -95,8 +117,7 @@ export function PoolsHome({ pools, invites, welcome }: { pools: PoolSummary[]; i
                 <div className="p-5 pb-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">Private pool</p>
-                      <p className="mt-1 truncate font-display text-[20px] font-semibold leading-tight text-[var(--qf-ink)]">{p.name}</p>
+                      <p className="truncate font-display text-[20px] font-semibold leading-tight text-[var(--qf-ink)]">{p.name}</p>
                     </div>
                     <span className="flex shrink-0 flex-wrap justify-end gap-1.5">
                       {p.status !== "active" && <StatusBadge status={p.status} />}
@@ -153,6 +174,44 @@ export function PoolsHome({ pools, invites, welcome }: { pools: PoolSummary[]; i
           ))}
         </ul>
       )}
+
+      {deleted.length > 0 && (
+        <section aria-labelledby="del-h" className="mt-10">
+          <h2 id="del-h" className="font-display text-[18px] font-semibold text-[var(--qf-ink)]">
+            Scheduled for deletion
+          </h2>
+          <p className="mt-1 text-[13.5px] text-[var(--qf-ink-soft)]">Only you and other admins see these. Members cannot open them. Restore one to bring it back exactly as it was.</p>
+          <ul className="mt-4 divide-y divide-[var(--qf-line)] rounded-xl border border-dashed border-[var(--qf-line)]">
+            {deleted.map((p) => (
+              <li key={p.id} className="flex flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+                <div className="min-w-0">
+                  <p className="truncate font-display text-[16px] font-semibold text-[var(--qf-ink)]">{p.name}</p>
+                  <p className="text-[12.5px] text-[var(--qf-ink-soft)]">
+                    Deleted <DateDisplay value={p.deletedAt.toISOString()} />
+                    {p.deletedByName ? ` by ${p.deletedByName}` : ""} · permanently deleted after <DateDisplay value={p.purgeAfter.toISOString()} />
+                    {p.deletionReason ? ` · “${p.deletionReason}”` : ""}
+                  </p>
+                </div>
+                <RestorePoolButton poolId={p.id} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <Link
+        href="/qfinera/learn/pool-guide"
+        className="group mt-10 flex items-center justify-between gap-3 rounded-xl border border-[var(--qf-line)] px-4 py-3.5 transition-colors hover:border-[var(--qf-brass)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]"
+      >
+        <span className="flex items-center gap-3">
+          <BookOpen size={18} className="text-[var(--qf-brass-dark)]" aria-hidden="true" />
+          <span>
+            <span className="block font-semibold text-[var(--qf-ink)]">New to pools?</span>
+            <span className="block text-[13px] text-[var(--qf-ink-soft)]">Read the Pool Guide: roles, NAV, units, approvals.</span>
+          </span>
+        </span>
+        <ArrowRight size={15} className="text-[var(--qf-ink-soft)] transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
+      </Link>
     </>
   );
 }

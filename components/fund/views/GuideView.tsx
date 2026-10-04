@@ -1,8 +1,8 @@
-"use client";
-
-// "How this pool works": a short, plain-language guide to the pool's
-// workflows. Describes the rules the services enforce; keep it in step with
-// docs/qfinera-fund/ACCOUNTING_RULES.md.
+// The Pool Guide: a short, plain-language guide to how a QFinera pool works.
+// Shown inside every pool (GuideView) and, for anyone, from Learn
+// (/qfinera/learn/pool-guide via PoolGuideContent). Describes the rules the
+// services enforce; keep it in step with docs/qfinera-fund/ACCOUNTING_RULES.md.
+// Server component: no client JavaScript.
 import { Disclaimer, PageHeader, SectionCard } from "@/components/fund/parts";
 
 type Section = { id: string; title: string; body: React.ReactNode };
@@ -40,16 +40,37 @@ const SECTIONS: Section[] = [
   },
   {
     id: "roles",
-    title: "Members and roles",
+    title: "Roles: Viewer, Member, Manager, Admin",
     body: (
       <List
         items={[
-          <><Term>Member</Term>: sees the pool&apos;s NAV, positions, trades and reports; records and tracks their own contributions and withdrawals.</>,
-          <><Term>Manager</Term>: everything a member can do, plus recording trades, watchlist research and contributions on a member&apos;s behalf.</>,
-          <><Term>Admin</Term>: everything a manager can do, plus approving contributions and withdrawals, confirming funds, recording prices, striking the NAV, editing or reversing executed trades, settings and the audit trail.</>,
+          <><Term>Viewer</Term>: read-only. Sees the pool&apos;s NAV, positions, trades and reports, and their own records. Can ask to become a member with &ldquo;Request to join as member&rdquo;.</>,
+          <><Term>Member</Term>: everything a viewer sees, plus recording their own contributions and withdrawals, commenting, and adding watchlist notes.</>,
+          <><Term>Manager</Term>: runs the pool day to day: records trades, expenses and contributions on a member&apos;s behalf, and reviews join requests. Approval-level changes go to an admin first (see below).</>,
+          <><Term>Admin</Term>: full control: approves money movements and manager requests, records prices, strikes the NAV, corrects or reverses trades, changes roles and settings, and can delete the pool.</>,
           "Every action is checked on the server against your role; hiding a button is only a convenience.",
         ]}
       />
+    ),
+  },
+  {
+    id: "approvals",
+    title: "Manager requests and admin approval",
+    body: (
+      <>
+        <P>
+          When a manager makes an approval-level change (approving a contribution or withdrawal, reversing or correcting a trade, striking the NAV, changing a
+          role or a setting, or deleting the pool), QFinera records it as a <Term>request</Term> instead. Nothing changes until an admin approves it on the
+          Approvals page.
+        </P>
+        <List
+          items={[
+            "Each request shows who asked, what would change (before → after), and why.",
+            "Approving applies the change with the admin's authority, running every normal check again. Rejecting changes nothing.",
+            "Every request, approval and rejection is in the audit trail.",
+          ]}
+        />
+      </>
     ),
   },
   {
@@ -196,39 +217,69 @@ const SECTIONS: Section[] = [
       <P>
         Every change (approvals, trades, corrections, prices, NAVs, settings) is recorded in the audit trail with who, when, the values before and after, and the
         reason where one is required. The audit trail and the money ledger are append-only: mistakes are corrected with new entries, never by editing history.
-        Admins can review the trail on the Audit page.
+        Admins and managers can review the trail on the Audit page.
+      </P>
+    ),
+  },
+  {
+    id: "deletion",
+    title: "Deleting a pool",
+    body: (
+      <P>
+        Only an admin can delete a pool, by typing its name to confirm. The pool disappears for every member at once, but all its records are kept for 30 days
+        and an admin can restore it from the Pools page during that time. After 30 days it is permanently deleted.
+      </P>
+    ),
+  },
+  {
+    id: "global-watch",
+    title: "Research and Global Watch",
+    body: (
+      <P>
+        The pool&apos;s Watchlist holds research notes for this pool only. Useful findings for everyone (an announcement, an article, a risk) belong in Global
+        Watch, which every QFinera member can read. Neither is a buy or sell signal.
       </P>
     ),
   },
 ];
 
+/** The guide itself, with its table of contents. Used in a pool and from Learn. */
+export function PoolGuideContent() {
+  return (
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[13rem_minmax(0,1fr)] [&>*]:min-w-0">
+      <nav aria-label="Guide contents" className="lg:sticky lg:top-24 lg:self-start">
+        <ol className="flex gap-1.5 overflow-x-auto pb-1 text-[13.5px] [scrollbar-width:none] lg:block lg:space-y-1 lg:overflow-visible [&::-webkit-scrollbar]:hidden">
+          {SECTIONS.map((s) => (
+            <li key={s.id} className="shrink-0">
+              <a
+                href={`#${s.id}`}
+                className="block rounded-full border border-[var(--qf-line)] px-3 py-1.5 text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)] lg:rounded-none lg:border-0 lg:px-0 lg:py-0.5 lg:underline-offset-2 lg:hover:underline"
+              >
+                {s.title}
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+      <div className="space-y-4">
+        {SECTIONS.map((s) => (
+          <section key={s.id} id={s.id} className="scroll-mt-24">
+            <SectionCard title={s.title}>
+              <div className="space-y-3">{s.body}</div>
+            </SectionCard>
+          </section>
+        ))}
+        <Disclaimer>QFinera records the pool&apos;s own decisions. It does not give investment, legal or tax advice.</Disclaimer>
+      </div>
+    </div>
+  );
+}
+
 export function GuideView() {
   return (
     <>
-      <PageHeader title="How this pool works" description="A short guide to the pool's workflows, roles and numbers." />
-      <div className="grid gap-6 lg:grid-cols-[13rem_1fr]">
-        <nav aria-label="Guide contents" className="lg:sticky lg:top-4 lg:self-start">
-          <ol className="space-y-1 text-[13.5px]">
-            {SECTIONS.map((s) => (
-              <li key={s.id}>
-                <a href={`#${s.id}`} className="text-[var(--qf-ink-soft)] underline-offset-2 hover:text-[var(--qf-ink)] hover:underline">
-                  {s.title}
-                </a>
-              </li>
-            ))}
-          </ol>
-        </nav>
-        <div className="space-y-4">
-          {SECTIONS.map((s) => (
-            <section key={s.id} id={s.id} className="scroll-mt-4">
-              <SectionCard title={s.title}>
-                <div className="space-y-3">{s.body}</div>
-              </SectionCard>
-            </section>
-          ))}
-          <Disclaimer>QFinera records the pool&apos;s own decisions. It does not give investment, legal or tax advice.</Disclaimer>
-        </div>
-      </div>
+      <PageHeader eyebrow="Pool Guide" title="How this pool works" description="Roles, money in and out, NAV, trades and approvals, in plain language." />
+      <PoolGuideContent />
     </>
   );
 }

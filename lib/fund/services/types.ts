@@ -27,8 +27,12 @@ export function todayIst(now: Date = new Date()): string {
 
 /** Throws unless the fund exists and is active. */
 export async function assertFundActive(db: Db, fundId: number): Promise<void> {
-  const row = await one<{ status: string }>(db, "SELECT status FROM qfinera_funds WHERE id = $1", [fundId]);
-  if (!row) throw notFoundError("Fund");
+  const row = await one<{ status: string; deleted: boolean }>(
+    db,
+    "SELECT status, deleted_at IS NOT NULL AS deleted FROM qfinera_funds WHERE id = $1",
+    [fundId]
+  );
+  if (!row || row.deleted) throw notFoundError("Fund");
   if (row.status !== "active") throw conflictError("This fund is closed.");
 }
 

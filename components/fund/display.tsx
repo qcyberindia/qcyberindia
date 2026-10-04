@@ -129,14 +129,18 @@ export function StatusBadge({ status, label }: { status: string | null | undefin
   );
 }
 
-/** Market-data freshness. Unavailable, delayed and stale data are labelled, never hidden. */
+/**
+ * Price freshness. QFinera has no live market feed: every price is recorded
+ * by the pool, so a "LIVE"-quality snapshot is shown as "Recent" (never
+ * "Live"). Unavailable and stale prices are labelled, never hidden.
+ */
 export function QualityBadge({ quality, stale = false }: { quality: string | null | undefined; stale?: boolean }) {
   const q = quality ?? "UNAVAILABLE";
   const text: Record<string, string> = {
-    LIVE: "Live",
+    LIVE: "Recent",
     DELAYED: "Delayed",
-    EOD: "End of day",
-    MANUAL: "Manual",
+    EOD: "Closing price",
+    MANUAL: "Recorded",
     UNAVAILABLE: "Price unavailable",
   };
   const tone: BadgeTone = q === "UNAVAILABLE" || stale ? "negative" : q === "LIVE" || q === "EOD" ? "final" : "pending";

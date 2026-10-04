@@ -1,14 +1,15 @@
 // Watchlist: the fund's shared research notes. Informational only: it never
 // touches accounting, and it carries no buy/sell signals, targets or advice.
 //
-//   MANAGER/ADMIN (watchlist:write)  add, edit, change status, archive/restore
-//   every member (watchlist:comment) read and comment
+//   MANAGER/ADMIN (watchlist:write)  add, edit, change status, archive/restore any item
+//   MEMBER (watchlist:create)        add, and edit/archive/restore their OWN items
+//   MEMBER and above (watchlist:comment) read and comment; VIEWER reads
 //
 // Comments are append-only discussion; items are archived, never deleted.
 import { writeAudit } from "@/lib/fund/audit";
 import { inTransaction, one, type Db } from "@/lib/fund/db";
 import { conflictError, notFoundError, validationError } from "@/lib/fund/errors";
-import { assertPermission } from "@/lib/fund/rbac";
+import { ForbiddenError, assertPermission, hasPermission, type FundActor } from "@/lib/fund/rbac";
 import { quotesFor, type Instrument } from "@/lib/fund/services/market";
 import { assertFundActive, type ServiceCtx } from "@/lib/fund/services/types";
 import type { Quote } from "@/lib/market-data";
@@ -46,6 +47,7 @@ export type WatchlistItem = {
   notes: string | null;
   researchUrl: string | null;
   status: WatchlistStatus;
+  createdBy: number;
   createdByName: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -75,6 +77,7 @@ function toItem(r: ItemRow, quote: Quote | null): WatchlistItem {
     notes: r.notes,
     researchUrl: r.research_url,
     status: r.status,
+    createdBy: r.created_by,
     createdByName: r.created_by_name,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
@@ -160,11 +163,21 @@ export type WatchlistInput = {
   status: WatchlistStatus;
 };
 
+/** MANAGER/ADMIN edit any item; a MEMBER edits only the items they created. */
+export function canEditWatchlistItem(actor: FundActor, createdBy: number): boolean {
+  if (hasPermission(actor, "watchlist:write")) return true;
+  return hasPermission(actor, "watchlist:create") && actor.userId === createdBy;
+}
+
+function assertCanEdit(ctx: ServiceCtx, createdBy: number): void {
+  if (!canEditWatchlistItem(ctx.actor, createdBy)) throw new ForbiddenError("Only the author or a pool manager can change this item.");
+}
+
 export async function createWatchlistItem(
   ctx: ServiceCtx,
   input: WatchlistInput & { instrumentId: number }
 ): Promise<WatchlistItem> {
-  assertPermission(ctx.actor, "watchlist:write");
+  if (!hasPermission(ctx.actor, "watchlist:write")) assertPermission(ctx.actor, "watchlist:create");
   return inTransaction(async (db) => {
     await assertFundActive(db, ctx.fundId);
     const instrument = await one<{ id: number; symbol: string }>(
@@ -204,10 +217,11 @@ export async function createWatchlistItem(
 }
 
 export async function updateWatchlistItem(ctx: ServiceCtx, id: number, patch: Partial<WatchlistInput>): Promise<WatchlistItem> {
-  assertPermission(ctx.actor, "watchlist:write");
+  assertPermission(ctx.actor, "watchlist:view");
   return inTransaction(async (db) => {
     await db.query("SELECT id FROM qfinera_fund_watchlist_items WHERE id = $1 AND fund_id = $2 FOR UPDATE", [id, ctx.fundId]);
     const before = await loadItem(db, ctx.fundId, id);
+    assertCanEdit(ctx, before.created_by);
     if (before.archived_at) throw conflictError("Restore this item before editing it.");
     await db.query(
       `UPDATE qfinera_fund_watchlist_items
@@ -248,10 +262,11 @@ export async function updateWatchlistItem(ctx: ServiceCtx, id: number, patch: Pa
 }
 
 export async function setWatchlistArchived(ctx: ServiceCtx, id: number, archived: boolean): Promise<WatchlistItem> {
-  assertPermission(ctx.actor, "watchlist:write");
+  assertPermission(ctx.actor, "watchlist:view");
   return inTransaction(async (db) => {
     await db.query("SELECT id FROM qfinera_fund_watchlist_items WHERE id = $1 AND fund_id = $2 FOR UPDATE", [id, ctx.fundId]);
     const before = await loadItem(db, ctx.fundId, id);
+    assertCanEdit(ctx, before.created_by);
     if ((before.archived_at !== null) === archived) {
       throw conflictError(archived ? "This item is already archived." : "This item is not archived.");
     }

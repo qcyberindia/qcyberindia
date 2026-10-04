@@ -15,7 +15,10 @@ import {
   Receipt,
   ScrollText,
   Settings,
-  Users, BookOpen } from "lucide-react";
+  Users,
+  BookOpen,
+  ClipboardCheck,
+} from "lucide-react";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import { Drawer } from "@/components/fund/overlays";
 import { NAV_ITEMS, POOLS_BASE, isNavActive, poolBase, visibleNav, type NavIcon } from "@/components/fund/nav";
@@ -37,6 +40,7 @@ const ICONS: Record<NavIcon, typeof Users> = {
   audit: ScrollText,
   settings: Settings,
   guide: BookOpen,
+  approvals: ClipboardCheck,
 };
 
 const focusRing = "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--qf-brass)]";
@@ -150,8 +154,7 @@ export function FundSidebar() {
     <aside className="hidden border-r border-[var(--qf-line)] bg-[var(--qf-cream-1)] lg:block">
       <div className="sticky top-16 flex h-[calc(100dvh-4rem)] flex-col gap-6 overflow-y-auto p-4">
         <div>
-          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-[var(--qf-brass-dark)]">Private pool</p>
-          <p className="mt-1 truncate font-display text-[18px] font-semibold leading-tight text-[var(--qf-ink)]" title={poolName}>
+          <p className="truncate font-display text-[18px] font-semibold leading-tight text-[var(--qf-ink)]" title={poolName}>
             {poolName}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">

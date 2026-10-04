@@ -203,7 +203,7 @@ async function findOpenInvite(db: Db, token: string, lock: boolean): Promise<Ope
        JOIN qfinera_funds f ON f.id = i.fund_id
        LEFT JOIN qfinance_users u ON u.id = i.created_by
       WHERE i.token_hash = $1 AND i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > now()
-        AND f.status = 'active'
+        AND f.status = 'active' AND f.deleted_at IS NULL
       ${lock ? "FOR UPDATE OF i" : ""}`,
     [hashInviteToken(token)]
   );
@@ -303,7 +303,7 @@ export async function pendingInvitesFor(db: Db, email: string): Promise<Array<{ 
     `SELECT f.name AS pool_name, i.role, i.expires_at
        FROM qfinera_fund_invites i JOIN qfinera_funds f ON f.id = i.fund_id
       WHERE lower(i.email) = lower($1) AND i.used_at IS NULL AND i.revoked_at IS NULL AND i.expires_at > now()
-        AND f.status = 'active'
+        AND f.status = 'active' AND f.deleted_at IS NULL
       ORDER BY i.created_at DESC LIMIT 20`,
     [email]
   );

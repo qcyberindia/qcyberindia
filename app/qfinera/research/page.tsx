@@ -20,7 +20,7 @@ const STEPS = [
     icon: BookOpen,
     title: "Understand the concept",
     body: "Start with the idea itself: what a share, an index or a cost really is. Short Learn chapters, one question each.",
-    href: "/qfinera/learn/beginner",
+    href: "/qfinera/learn",
     cta: "Open Learn",
   },
   {
@@ -39,6 +39,13 @@ const STEPS = [
   },
   {
     icon: Eye,
+    title: "Share what you find",
+    body: "Post an announcement, an article or a risk to Global Watch with its source, so every QFinera member can read it.",
+    href: "/qfinera/watch",
+    cta: "Open Global Watch",
+  },
+  {
+    icon: NotebookPen,
     title: "Keep shared notes with your group",
     body: "Inside a pool, the Watchlist holds the group's research notes, links and discussion for each instrument. Notes, not tips.",
     href: "/qfinera/pools",
@@ -110,14 +117,21 @@ export default async function ResearchPage() {
             </section>
           )}
 
-          <section className="mt-12 rounded-xl border border-dashed border-[var(--qf-line)] p-5 sm:p-6">
-            <div className="flex items-center gap-2">
-              <NotebookPen size={18} className="text-[var(--qf-ink-soft)]" aria-hidden="true" />
-              <h2 className="font-display text-[17px] font-semibold text-[var(--qf-ink)]">Being built: a personal research journal</h2>
-            </div>
-            <p className="mt-1.5 text-[14px] leading-relaxed text-[var(--qf-ink-soft)]">
-              Turning a journal entry into an organized thesis (evidence, reasoning, conclusion) is next on our list. It isn&rsquo;t available yet.
-            </p>
+          <section className="mt-12 grid gap-4 md:grid-cols-2">
+            <Link href="/qfinera/watch/new" className="group flex items-start gap-3 rounded-xl border border-[var(--qf-brass)]/45 bg-[var(--qf-brass)]/[0.07] p-5 hover:border-[var(--qf-brass)]">
+              <Eye size={20} className="mt-0.5 shrink-0 text-[var(--qf-brass-dark)]" aria-hidden="true" />
+              <span>
+                <span className="block font-display text-[17px] font-semibold text-[var(--qf-ink)]">Found something useful?</span>
+                <span className="mt-1 block text-[14px] text-[var(--qf-ink-soft)]">Share it on Global Watch so other members can read the source and understand it.</span>
+              </span>
+            </Link>
+            <Link href="/qfinera/roadmap" className="group flex items-start gap-3 rounded-xl border border-[var(--qf-line)] p-5 hover:border-[var(--qf-brass)]">
+              <NotebookPen size={20} className="mt-0.5 shrink-0 text-[var(--qf-ink-soft)]" aria-hidden="true" />
+              <span>
+                <span className="block font-display text-[17px] font-semibold text-[var(--qf-ink)]">A personal research journal</span>
+                <span className="mt-1 block text-[14px] text-[var(--qf-ink-soft)]">Under development. See what&rsquo;s next for QFinera.</span>
+              </span>
+            </Link>
           </section>
         </div>
       </main>

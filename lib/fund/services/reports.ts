@@ -8,6 +8,7 @@ import { TAX_DISCLAIMER, estimateTax, LONG_TERM_DAYS } from "@/lib/accounting/ta
 import { can, type FundContext } from "@/lib/fund/auth";
 import { one, type Db } from "@/lib/fund/db";
 import { notFoundError } from "@/lib/fund/errors";
+import { canPropose } from "@/lib/fund/rbac";
 import { getHoldings, latestOfficialNavs, memberPosition, type MemberPosition } from "@/lib/fund/queries";
 import { getOfficialSnapshot, listNavHistory, previewNav, type NavPreview, type NavSnapshotRow } from "@/lib/fund/services/nav";
 import { accountingRule } from "@/lib/fund/services/types";
@@ -42,7 +43,8 @@ export async function dailyReport(db: Db, ctx: FundContext, date: string): Promi
   const fundId = ctx.fund.id;
   const detail = can(ctx, "contributions:view_all");
   const official = await getOfficialSnapshot(db, fundId, date);
-  const preview = can(ctx, "nav:finalize") ? await previewNav(db, fundId, date) : null;
+  // ADMIN strikes; a MANAGER sees the same preview to send a strike for approval.
+  const preview = can(ctx, "nav:finalize") || canPropose(ctx.actor, "nav:finalize") ? await previewNav(db, fundId, date) : null;
 
   const { rows: trades } = await db.query<{
     id: number; symbol: string; exchange: string; product: string; action: string; side: string; quantity: string; price: string; net_value: string; status: string;

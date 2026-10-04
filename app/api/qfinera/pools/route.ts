@@ -6,18 +6,28 @@ import { toErrorResponse } from "@/lib/fund/errors";
 import { assertJsonMutation, jsonOk } from "@/lib/fund/http";
 import { CREATE_POOL_ACKNOWLEDGEMENT, MAX_POOLS_CREATED_PER_USER, PARTICIPATION_MODE } from "@/lib/fund/product-gate";
 import { pendingInvitesFor } from "@/lib/fund/services/invites";
+import { listDeletedPoolsFor } from "@/lib/fund/services/pool-deletion";
 import { createPool, listMyPools } from "@/lib/fund/services/pools";
 import { parseOptionalText, parseText, readJsonObject } from "@/lib/fund/validation";
 
-/** The caller's own pools and the invites addressed to them. Never other pools. */
+/**
+ * The caller's own pools and the invites addressed to them. Never other
+ * pools. Pools scheduled for deletion are listed separately, and only to
+ * their ADMINs (who can restore them).
+ */
 export async function GET(req: NextRequest) {
   try {
     const session = await requireActiveSession(req);
     const db = readDb();
-    const [pools, invites] = await Promise.all([listMyPools(db, session.userId), pendingInvitesFor(db, session.email)]);
+    const [pools, invites, deleted] = await Promise.all([
+      listMyPools(db, session.userId),
+      pendingInvitesFor(db, session.email),
+      listDeletedPoolsFor(db, session.userId),
+    ]);
     return jsonOk({
       pools,
       invites,
+      deleted,
       gate: { participationMode: PARTICIPATION_MODE, acknowledgement: CREATE_POOL_ACKNOWLEDGEMENT, maxPoolsCreated: MAX_POOLS_CREATED_PER_USER },
     });
   } catch (err) {

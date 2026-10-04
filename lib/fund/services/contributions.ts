@@ -133,6 +133,15 @@ export async function createContribution(
     return await inTransaction(async (db) => {
       await assertFundActive(db, ctx.fundId);
       await assertActiveMember(db, ctx.fundId, memberId);
+      // A VIEWER holds no stake: they must become a MEMBER before contributing.
+      const target = await one<{ role: string }>(
+        db,
+        "SELECT role FROM qfinera_fund_memberships WHERE fund_id = $1 AND user_id = $2",
+        [ctx.fundId, memberId]
+      );
+      if (target?.role === "VIEWER") {
+        throw conflictError("Viewers cannot contribute. Change their role to Member first.");
+      }
 
       const row = await one<ContributionRecord>(
         db,

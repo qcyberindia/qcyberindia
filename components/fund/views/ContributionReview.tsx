@@ -12,7 +12,8 @@ import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/compo
 import { formatTimestampIst, humanize } from "@/components/fund/format";
 import { useNotice } from "@/components/fund/notices";
 import { btnSecondary } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import type { UiPermission } from "@/components/fund/permissions";
+import { useCanAct, useFund } from "@/components/fund/session";
 import { ProofDropzone, formatBytes, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
 import { usePoolMutation } from "@/components/fund/useResource";
 import { ActionBar, StepIndicator, type WorkflowAction } from "@/components/fund/workflow";
@@ -36,7 +37,7 @@ export const CONTRIBUTION_STAGES = [
   { key: "FINALIZED", label: "Finalized", hint: "Units allocated. This record can no longer change." },
 ];
 
-type Can = ReturnType<typeof useCan>;
+type Can = (permission: UiPermission) => boolean;
 type Proof = ContributionDetailDto["proofs"][number];
 
 /** The lifecycle steps this viewer may take on this contribution now. The first primary one is the next step. */
@@ -49,20 +50,20 @@ export function contributionActions(d: ContributionDetailDto, can: Can, userId: 
   const note = { label: "Review note", min: 0, optional: true };
   const actions: WorkflowAction[] = [];
   if (c.status === "PENDING" && can("contributions:approve")) {
-    actions.push({ key: "approve", label: "Approve", title: "Approve this contribution?", consequences: `Approval does not allocate units. Next, confirm the money has arrived in the pool's bank account.${selfNote}`, reason: note, success: "Contribution approved." });
+    actions.push({ key: "approve", label: "Approve", title: "Approve this contribution?", consequences: `Approval does not allocate units. Next, confirm the money has arrived in the pool's bank account.${selfNote}`, reason: note, success: "Contribution approved.", approval: true });
   }
   if (c.status === "APPROVED" && can("contributions:confirm_funds")) {
-    actions.push({ key: "confirm-funds", label: "Confirm funds received", title: "Confirm the money arrived?", consequences: `Check the pool's bank statement first. This fixes the NAV date: the next end-of-day NAV after this moment (by the pool's cutoff time). Units are allocated when that NAV is struck.${selfNote}`, reason: note, success: "Funds confirmed; waiting for the NAV." });
+    actions.push({ key: "confirm-funds", label: "Confirm funds received", title: "Confirm the money arrived?", consequences: `Check the pool's bank statement first. This fixes the NAV date: the next end-of-day NAV after this moment (by the pool's cutoff time). Units are allocated when that NAV is struck.${selfNote}`, reason: note, success: "Funds confirmed; waiting for the NAV.", approval: true });
   }
   if (c.status === "AWAITING_NAV" && d.awaiting?.navOfficial && can("nav:finalize")) {
-    actions.push({ key: "finalize", label: "Allocate units now", title: "Finalize at the official NAV?", consequences: `Units are allocated at the official NAV of ${d.awaiting.navDate}. This cannot be undone.`, success: "Units allocated." });
+    actions.push({ key: "finalize", label: "Allocate units now", title: "Finalize at the official NAV?", consequences: `Units are allocated at the official NAV of ${d.awaiting.navDate}. This cannot be undone.`, success: "Units allocated.", approval: true });
   }
   if ((c.status === "PENDING" || c.status === "APPROVED") && can("contributions:approve")) {
-    actions.push({ key: "reject", label: "Reject", title: "Reject this contribution?", variant: "danger", consequences: "The request is closed. No units are allocated. The contributor sees the reason.", reason: { label: "Reason", min: 3 }, success: "Contribution rejected." });
+    actions.push({ key: "reject", label: "Reject", title: "Reject this contribution?", variant: "danger", consequences: "The request is closed. No units are allocated. The contributor sees the reason.", reason: { label: "Reason", min: 3 }, success: "Contribution rejected.", approval: true });
   }
   const ownPending = own && c.status === "PENDING";
   if (ownPending || (["PENDING", "APPROVED", "AWAITING_NAV"].includes(c.status) && can("contributions:approve"))) {
-    actions.push({ key: "cancel", label: "Cancel", title: "Cancel this contribution?", variant: "secondary", consequences: "The request is closed. No units are allocated.", reason: { label: "Reason", min: 3, optional: ownPending }, success: "Contribution cancelled." });
+    actions.push({ key: "cancel", label: "Cancel", title: "Cancel this contribution?", variant: "secondary", consequences: "The request is closed. No units are allocated.", reason: { label: "Reason", min: 3, optional: ownPending }, success: "Contribution cancelled.", approval: !own });
   }
   return actions;
 }
@@ -207,7 +208,7 @@ function History({ audit }: { audit: NonNullable<ContributionDetailDto["audit"]>
 
 /** The record body (no actions). */
 export function ContributionReview({ d, onDone }: { d: ContributionDetailDto; onDone: () => void }) {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId, userId } = useFund();
   const c = d.contribution;
   const isContributor = c.member_id === userId;
@@ -310,7 +311,7 @@ export function ContributionReview({ d, onDone }: { d: ContributionDetailDto; on
 
 /** The actions for this viewer, as a button row (drawer footer / page header). */
 export function ContributionReviewActions({ d, onDone }: { d: ContributionDetailDto; onDone: () => void }) {
-  const can = useCan();
+  const can = useCanAct();
   const { userId } = useFund();
   return (
     <ActionBar

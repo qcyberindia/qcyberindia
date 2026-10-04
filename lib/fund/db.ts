@@ -40,6 +40,11 @@ export async function one<R extends QueryResultRow>(db: Db, text: string, values
 
 /** Takes the per-fund lock so concurrent money operations serialize. */
 export async function lockFund(db: Db, fundId: number): Promise<void> {
-  const row = await one<{ id: number }>(db, "SELECT id FROM qfinera_funds WHERE id = $1 FOR UPDATE", [fundId]);
-  if (!row) throw notFoundError("Fund");
+  const row = await one<{ id: number; deleted: boolean }>(
+    db,
+    "SELECT id, deleted_at IS NOT NULL AS deleted FROM qfinera_funds WHERE id = $1 FOR UPDATE",
+    [fundId]
+  );
+  // A pool scheduled for deletion accepts no further changes.
+  if (!row || row.deleted) throw notFoundError("Fund");
 }

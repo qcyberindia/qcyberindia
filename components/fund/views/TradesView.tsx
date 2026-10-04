@@ -11,7 +11,7 @@ import { recordHref } from "@/components/fund/nav";
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog } from "@/components/fund/overlays";
 import { EmptyState, PageHeader, SectionCard, btnPrimary } from "@/components/fund/parts";
-import { useCan, useFund } from "@/components/fund/session";
+import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField, Pagination } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import {
@@ -98,7 +98,7 @@ function TicketPreview({ preview, closing }: { preview: TradePreviewDto; closing
 }
 
 function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId } = useFund();
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
@@ -255,7 +255,7 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
 }
 
 export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
-  const can = useCan();
+  const can = useCanAct();
   const { poolId } = useFund();
   const [status, setStatus] = useState(initialStatus);
   const [product, setProduct] = useState("");

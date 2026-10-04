@@ -1,9 +1,9 @@
 "use client";
 
 // The QFinera product header, used by every /qfinera page: identity, the
-// primary sections (Learn, Research, Community, Pools) with active state,
-// theme, and account. On phones the sections live in the bottom tab bar
-// (QFineraTabBar), so the top bar stays uncluttered.
+// primary sections (Learn, Research, Global Watch, Community, Pools) with
+// active state, theme, and account. On phones the sections live in the
+// bottom tab bar (QFineraTabBar), so the top bar stays uncluttered.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { UserRound } from "lucide-react";
@@ -24,7 +24,7 @@ export default function QFinanceHeader({ wide = false }: { wide?: boolean }) {
           Q<em className="not-italic text-[var(--qf-brass)]">Finera</em>
         </Link>
 
-        <ul className="hidden items-center gap-1 md:flex">
+        <ul className="hidden items-center gap-0.5 md:flex lg:gap-1">
           {PRIMARY_NAV.map((item) => {
             const active = isActive(pathname, item);
             return (
@@ -32,12 +32,12 @@ export default function QFinanceHeader({ wide = false }: { wide?: boolean }) {
                 <Link
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`relative rounded-md px-3 py-2 text-[14px] font-medium transition-colors ${focus} ${
+                  className={`relative whitespace-nowrap rounded-md px-2.5 py-2 text-[14px] font-medium transition-colors lg:px-3 ${focus} ${
                     active ? "text-[var(--qf-ink)]" : "text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)]"
                   }`}
                 >
                   {item.label}
-                  {active && <span aria-hidden="true" className="absolute inset-x-3 -bottom-[13px] h-0.5 rounded-full bg-[var(--qf-brass)] sm:-bottom-[17px]" />}
+                  {active && <span aria-hidden="true" className="absolute inset-x-2.5 -bottom-[13px] h-0.5 rounded-full bg-[var(--qf-brass)] sm:-bottom-[17px]" />}
                 </Link>
               </li>
             );
@@ -55,18 +55,20 @@ export default function QFinanceHeader({ wide = false }: { wide?: boolean }) {
               className={`flex min-h-9 items-center gap-2 rounded-md border border-[var(--qf-line)] px-3 py-1.5 text-[13.5px] font-medium text-[var(--qf-ink)] hover:border-[var(--qf-brass)] ${focus}`}
             >
               <UserRound size={15} aria-hidden="true" />
-              <span className="max-w-[9rem] truncate">{user.displayName}</span>
+              <span className="hidden max-w-[9rem] truncate sm:inline">{user.displayName}</span>
+              <span className="sr-only sm:hidden">Account</span>
             </Link>
           ) : (
             <div className="flex items-center gap-2">
-              <Link href="/qfinera/login" className={`hidden rounded-md px-3 py-2 text-[14px] font-medium text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)] sm:inline-block ${focus}`}>
+              <Link href="/qfinera/login" className={`rounded-md px-2 py-2 text-[14px] font-medium text-[var(--qf-ink-soft)] hover:text-[var(--qf-ink)] sm:px-3 ${focus}`}>
                 Sign in
               </Link>
               <Link
                 href="/qfinera/register"
-                className={`rounded-md bg-[var(--qf-brass-dark)] px-3.5 py-2 font-display text-[13.5px] font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 ${focus}`}
+                className={`whitespace-nowrap rounded-md bg-[var(--qf-brass-dark)] px-3 py-2 font-display text-[13.5px] font-semibold text-[var(--qf-cream-0)] transition-opacity hover:opacity-90 sm:px-3.5 ${focus}`}
               >
-                Join QFinera
+                <span className="sm:hidden">Join</span>
+                <span className="hidden sm:inline">Join QFinera</span>
               </Link>
             </div>
           )}

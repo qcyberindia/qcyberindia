@@ -45,6 +45,13 @@ export const UI_PERMISSIONS = [
   "settings:manage",
   "corrections:backdate",
   "exports:run",
+  "members:request_join",
+  "watchlist:create",
+  "join_requests:review",
+  "requests:view",
+  "requests:create",
+  "requests:review",
+  "pool:delete",
 ] as const satisfies readonly FundPermission[];
 
 export type UiPermission = (typeof UI_PERMISSIONS)[number];

@@ -16,6 +16,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${base}/contact`, changeFrequency: "yearly", priority: 0.6 },
     { url: `${base}/careers`, changeFrequency: "monthly", priority: 0.5 },
     { url: `${base}/blog`, changeFrequency: "weekly", priority: 0.7 },
+    // QFinera public pages (pools, Global Watch and accounts are not indexed).
+    ...["", "/learn", "/learn/beginner", "/learn/pool-guide", "/research", "/community", "/why-india-investing", "/about", "/roadmap"].map(
+      (path): MetadataRoute.Sitemap[number] => ({ url: `${base}/qfinera${path}`, changeFrequency: "weekly", priority: path === "" ? 0.9 : 0.6 })
+    ),
   ];
 
   const blogRoutes: MetadataRoute.Sitemap = getAllPosts().map((post) => ({

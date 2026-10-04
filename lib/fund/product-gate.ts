@@ -26,7 +26,7 @@ export const INVITE_TTL_DAYS = 7;
 export const PRIVATE_POOL_NOTICE =
   "QFinera Pools is private, invite-only record-keeping and accounting software for a group's own money. " +
   "QFinera does not hold funds, solicit investors, guarantee returns or give investment advice. " +
-  "Tax figures are estimates only. Market data may be delayed or unavailable.";
+  "Tax figures are estimates only. QFinera has no live market data: prices are recorded by the pool and labelled with their date.";
 
 /** What the creator must confirm before a pool exists. */
 export const CREATE_POOL_ACKNOWLEDGEMENT =

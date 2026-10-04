@@ -10,7 +10,7 @@ import { humanize } from "@/components/fund/format";
 import { useNotice } from "@/components/fund/notices";
 import { FormDialog, Modal } from "@/components/fund/overlays";
 import { EmptyState, PageHeader, SectionCard, btnPrimary } from "@/components/fund/parts";
-import { useCan } from "@/components/fund/session";
+import { useCanAct } from "@/components/fund/session";
 import { DataTable, Pagination } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import { ActionPanel, type WorkflowAction } from "@/components/fund/workflow";
@@ -59,7 +59,7 @@ function NewExpense({ open, onClose, onDone }: { open: boolean; onClose: () => v
 }
 
 export function ExpensesView() {
-  const can = useCan();
+  const can = useCanAct();
   const [page, setPage] = useState(1);
   const [creating, setCreating] = useState(false);
   const [selected, setSelected] = useState<Expense | null>(null);
@@ -71,8 +71,8 @@ export function ExpensesView() {
   const actions: WorkflowAction[] =
     selected?.status === "PENDING" && can("expenses:approve")
       ? [
-          { key: "approve", label: "Approve", title: "Approve this expense?", consequences: "Pool cash is reduced on the expense date. Refused if cash would go negative.", backdate: true, success: "Expense approved." },
-          { key: "reject", label: "Reject", variant: "danger", title: "Reject this expense?", consequences: "The expense is closed with no effect on cash.", reason: { label: "Reason", min: 3 }, success: "Expense rejected." },
+          { key: "approve", label: "Approve", title: "Approve this expense?", consequences: "Pool cash is reduced on the expense date. Refused if cash would go negative.", backdate: true, success: "Expense approved.", approval: true },
+          { key: "reject", label: "Reject", variant: "danger", title: "Reject this expense?", consequences: "The expense is closed with no effect on cash.", reason: { label: "Reason", min: 3 }, success: "Expense rejected.", approval: true },
         ]
       : [];
 
