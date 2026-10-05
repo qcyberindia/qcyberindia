@@ -202,12 +202,28 @@ function PositionsTable({ rows, caption, closed, delivery = false }: { rows: rea
           ? []
           : [
               { key: "q", header: "Qty", align: "right" as const, cell: (r: Row) => <QuantityDisplay value={r.quantity} /> },
-              { key: "a", header: "Entry", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.averageEntryPrice} dp={4} /> },
+              { key: "a", header: "Avg. entry", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.averageEntryPrice} dp={4} /> },
               {
-                key: "p",
-                header: "Last recorded price",
+                key: "x",
+                header: "Exposure",
                 align: "right" as const,
                 cell: (r: Row) => (
+                  <span className="whitespace-nowrap" title="Quantity × average entry price. Position size, not cash spent.">
+                    <MoneyDisplay value={r.entryNotional} />
+                    <span className="block text-[11.5px] text-[var(--qf-ink-soft)]">at entry</span>
+                  </span>
+                ),
+              },
+              {
+                key: "p",
+                header: "Recorded price",
+                align: "right" as const,
+                cell: (r: Row) =>
+                  r.price === null ? (
+                    <span className="whitespace-nowrap text-[12.5px] text-[var(--qf-ink-soft)]" title={r.priceUnavailableReason ?? "No price recorded yet."}>
+                      Not priced yet
+                    </span>
+                  ) : (
                   <span className="flex flex-col items-end gap-1" title={r.priceAsOf ? `Price as of ${new Date(r.priceAsOf).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} IST` : (r.priceUnavailableReason ?? undefined)}>
                     <MoneyDisplay value={r.price} dp={4} />
                     <QualityBadge quality={r.priceQuality} stale={r.priceStale} />
@@ -217,7 +233,7 @@ function PositionsTable({ rows, caption, closed, delivery = false }: { rows: rea
                       </span>
                     )}
                   </span>
-                ),
+                  ),
               },
               { key: "v", header: "Value in fund", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.marketValue} signed={r.direction === "SHORT"} /> },
               { key: "u", header: "Unrealized", align: "right" as const, cell: (r: Row) => <MoneyDisplay value={r.unrealizedPnl} signed /> },
@@ -270,7 +286,7 @@ export function HoldingsView() {
       ) : !h ? null : (
         <div className="space-y-6">
           <section aria-label="Position totals" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <FinancialMetric label="Value in fund" value={h.marketValue} hint={h.marketValue === null ? "Not shown: some prices are unavailable" : "Longs at market, short options as liabilities, intraday/futures at unrealized P&L"} />
+            <FinancialMetric label="Value in fund" value={h.marketValue} hint={h.marketValue === null ? "Shown once every open position has a recorded price" : "Longs at market, short options as liabilities, intraday/futures at unrealized P&L"} />
             <FinancialMetric label="Unrealized P&L" value={h.unrealizedPnl} signed />
             <FinancialMetric label="Realized P&L" value={h.realizedPnl} signed hint="Net of all charges" />
             <FinancialMetric label="Trading charges" value={h.chargesPaid} />
@@ -285,9 +301,9 @@ export function HoldingsView() {
           )}
           {(h.unpriced > 0 || h.stale > 0) && (
             <Disclaimer>
-              {h.unpriced > 0 && `${h.unpriced} position(s) have no price available. `}
-              {h.stale > 0 && `${h.stale} price(s) are stale: older than the last completed trading session. `}
-              Missing or stale prices are never filled in or estimated.
+              {h.unpriced > 0 && `${h.unpriced} open position${h.unpriced === 1 ? " is" : "s are"} not priced yet; record a closing price to value ${h.unpriced === 1 ? "it" : "them"}. `}
+              {h.stale > 0 && `${h.stale} price(s) are older than the last completed trading session. `}
+              Prices are never estimated.
             </Disclaimer>
           )}
           <div className="flex flex-wrap gap-6">
@@ -329,7 +345,11 @@ export function HoldingsView() {
                   )}
                 </SectionCard>
               )}
-              <SectionCard title="Open trading positions" flush>
+              <SectionCard
+                title="Open trading positions"
+                description="Exposure is position size. Intraday and futures are settled mark-to-market, so pool cash moves only by charges and the P&L settled on close."
+                flush
+              >
                 {trading.length === 0 ? (
                   <EmptyState title="No open trading positions" description="Intraday, futures and options positions appear here while open." />
                 ) : (

@@ -283,6 +283,8 @@ suite("Intraday pool: NAV allocation, payment proofs, Pool Chat (real database)"
       "Can someone explain today's NAV?",
     ]);
     expect(page.body.data.messages[3]).toMatchObject({ authorName: "viewer", authorRole: "VIEWER" });
+    expect(typeof page.body.data.participantCount).toBe("number");
+    expect(page.body.data.participantCount).toBeGreaterThanOrEqual(4);
   });
 
   it("outsiders, other pools, anonymous callers and suspended members cannot read or post", async () => {

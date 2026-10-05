@@ -243,7 +243,7 @@ export function ContributionsView() {
                     primary: true,
                     cell: (r) => (
                       <span className="whitespace-nowrap">
-                        #{r.id} · {r.memberName}
+                        {r.memberName}
                       </span>
                     ),
                   },

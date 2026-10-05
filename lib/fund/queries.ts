@@ -105,6 +105,8 @@ export type HoldingRow = {
   /** Cost incl. capitalized opening charges / average cost per unit (legacy names). */
   averageCost: string | null;
   costBasis: string;
+  /** Quantity x average entry price (excl. charges): the exposure taken on at entry. Display only. */
+  entryNotional: string;
   realizedPnl: string;
   chargesPaid: string;
   /** From the market-data provider; null when unavailable. Display only, never accounting. */
@@ -200,6 +202,7 @@ export async function getHoldings(db: Db, fundId: number): Promise<HoldingsSumma
       averageEntryPrice: avgEntry?.toDecimalString(4) ?? null,
       averageCost: open ? cost.divide(position.quantity).round(4).toDecimalString(4) : null,
       costBasis: cost.toDecimalString(2),
+      entryNotional: (open ? position.entryGross : Money.zero()).toDecimalString(2),
       realizedPnl: position.realizedPnl.toDecimalString(2),
       chargesPaid: position.chargesPaid.toDecimalString(2),
       price: price ? price.toDecimalString(4) : null,

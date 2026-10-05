@@ -98,6 +98,8 @@ export type ChatPage = {
   messages: ChatMessage[];
   /** True when older messages exist before the first one returned. */
   hasOlder: boolean;
+  /** Active members of this pool (everyone who can read the chat); latest page only. */
+  participantCount?: number;
 };
 
 /**
@@ -121,7 +123,16 @@ export async function listMessages(
     [fundId, opts.before ?? null, limit + 1]
   );
   const hasOlder = rows.length > limit;
-  return { messages: rows.slice(0, limit).reverse().map(toMessage), hasOlder };
+  const page: ChatPage = { messages: rows.slice(0, limit).reverse().map(toMessage), hasOlder };
+  if (opts.before == null) {
+    const count = await one<{ n: number }>(
+      db,
+      "SELECT COUNT(*)::int AS n FROM qfinera_fund_memberships WHERE fund_id = $1 AND status = 'active'",
+      [fundId]
+    );
+    page.participantCount = count?.n ?? 0;
+  }
+  return page;
 }
 
 async function loadOne(db: Db, fundId: number, id: number, forUpdate = false): Promise<Row | null> {

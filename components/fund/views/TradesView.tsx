@@ -14,6 +14,7 @@ import { EmptyState, PageHeader, SectionCard, btnPrimary } from "@/components/fu
 import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField, Pagination } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
+import { isMarkToMarket, newTradeNeedsCorrection, tradeHeadlineValue } from "@/components/fund/trade-display";
 import {
   ACTION_LABEL,
   DirectionLabel,
@@ -43,8 +44,9 @@ function productFor(segment: Segment, equityProduct: Product): Product {
 }
 
 /** Server-computed effect of the ticket (decimal strings; no browser arithmetic on money). */
-function TicketPreview({ preview, closing }: { preview: TradePreviewDto; closing: boolean }) {
+function TicketPreview({ preview, closing, product }: { preview: TradePreviewDto; closing: boolean; product: Product }) {
   const b = preview.before;
+  const mtm = isMarkToMarket(product);
   return (
     <div className="space-y-3 rounded-md border border-[var(--qf-line)] bg-[var(--qf-cream-1)]/50 p-3 text-[13.5px]" aria-live="polite">
       {preview.problem && (
@@ -54,7 +56,7 @@ function TicketPreview({ preview, closing }: { preview: TradePreviewDto; closing
       )}
       <dl className="grid grid-cols-3 gap-3">
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Gross value</dt>
+          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">{mtm ? "Exposure" : "Traded value"}</dt>
           <dd><MoneyDisplay value={preview.gross} /></dd>
         </div>
         <div>
@@ -62,10 +64,15 @@ function TicketPreview({ preview, closing }: { preview: TradePreviewDto; closing
           <dd><MoneyDisplay value={preview.totalCharges} /></dd>
         </div>
         <div>
-          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Net cash impact</dt>
+          <dt className="text-[11px] uppercase tracking-wide text-[var(--qf-ink-soft)]">Cash impact</dt>
           <dd className="font-semibold"><MoneyDisplay value={preview.problem ? null : preview.cashImpact} signed /></dd>
         </div>
       </dl>
+      {mtm && (
+        <p className="text-[12.5px] text-[var(--qf-ink-soft)]">
+          Exposure is the position size, not cash spent. This product is settled mark-to-market: opening moves only the charges; the close settles the price difference.
+        </p>
+      )}
       {(closing || b.direction) && (
         <dl className="grid grid-cols-3 gap-3 border-t border-[var(--qf-line)] pt-3">
           <div>
@@ -117,6 +124,7 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
   const [confirmBackdate, setConfirmBackdate] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<TradePreviewDto | null>(null);
+  const [serverAskedCorrection, setServerAskedCorrection] = useState(false);
 
   const product = productFor(segment, equityProduct);
   const longOnly = product === "EQUITY_DELIVERY";
@@ -143,6 +151,10 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
       ctrl.abort();
     };
   }, [previewKey, poolId]);
+
+  // Shown only when this date falls on or before the latest official NAV
+  // (the server enforces the same rule and asks if the preview was missed).
+  const showCorrection = can("trades:backdate") && execute && newTradeNeedsCorrection(previewKey ? preview : null, serverAskedCorrection);
 
   const chooseSegment = (s: Segment) => {
     setSegment(s);
@@ -180,12 +192,13 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
             externalRef: externalRef.trim() || undefined,
             notes: notes.trim() || undefined,
             execute,
-            ...(backdateReason.trim() || confirmBackdate ? { backdateReason: backdateReason.trim(), confirmBackdate } : {}),
+            ...(showCorrection && (backdateReason.trim() || confirmBackdate) ? { backdateReason: backdateReason.trim(), confirmBackdate } : {}),
           });
           notify("success", execute ? "Trade executed." : "Draft saved.");
           onDone();
           onClose();
         } catch (err) {
+          if (/official NAV/i.test(errorMessage(err))) setServerAskedCorrection(true);
           setError(errorMessage(err));
         }
       }}
@@ -231,19 +244,20 @@ function NewTrade({ open, onClose, onDone }: { open: boolean; onClose: () => voi
         <DecimalField label={segment === "OPTION" ? "Premium (₹)" : "Price (₹)"} value={price} onChange={setPrice} decimals={4} required />
       </div>
       <DecimalField label="Estimated charges (₹)" value={estimatedCharges} onChange={setEstimatedCharges} decimals={2} placeholder="0.00" hint={CHARGES_HINT} />
-      {previewKey && preview && <TicketPreview preview={preview} closing={action.startsWith("CLOSE")} />}
+      {previewKey && preview && <TicketPreview preview={preview} closing={action.startsWith("CLOSE")} product={product} />}
       <TextField label="Contract note / broker reference" value={externalRef} onChange={setExternalRef} maxLength={64} hint="Optional. Prevents the same trade being entered twice." />
       <TextAreaField label="Notes" value={notes} onChange={setNotes} maxLength={1000} rows={2} />
       <label className="flex items-start gap-2 text-[13.5px]">
         <input type="checkbox" checked={execute} onChange={(e) => setExecute(e.target.checked)} className="mt-0.5 h-4 w-4" />
         Execute now (position and cash change on the trade date). Leave unticked to save a draft for review.
       </label>
-      {can("trades:backdate") && execute && (
-        <fieldset className="space-y-2 rounded-md border border-[var(--qf-line)] p-3">
-          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">
-            Administrator correction (only if dated on or before the latest official NAV)
-          </legend>
-          <TextField label="Correction reason" value={backdateReason} onChange={setBackdateReason} maxLength={500} />
+      {showCorrection && (
+        <fieldset className="space-y-2 rounded-md border border-[var(--qf-brass)]/50 p-3">
+          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Administrator correction</legend>
+          <p className="text-[13px] text-[var(--qf-ink-soft)]">
+            This trade is dated on or before the latest official NAV{preview?.latestOfficialNavDate ? ` (${preview.latestOfficialNavDate})` : ""}, so it is recorded as a backdated correction.
+          </p>
+          <TextField label="Correction reason" value={backdateReason} onChange={setBackdateReason} maxLength={500} required hint="At least 10 characters. Kept in the audit trail." />
           <label className="flex items-start gap-2 text-[13px]">
             <input type="checkbox" checked={confirmBackdate} onChange={(e) => setConfirmBackdate(e.target.checked)} className="mt-0.5 h-4 w-4" />
             I confirm this backdated trade. Official NAVs already struck are kept unchanged.
@@ -373,7 +387,6 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
                     cell: (r) => (
                       <span className="md:whitespace-nowrap">
                         {instrumentLabel({ ...r, instrumentType: r.instrument_type, underlying: r.underlying_symbol, expiryDate: r.expiry_date, strikePrice: r.strike_price, optionType: r.option_type })}
-                        <span className="ml-1.5 text-[12px] font-normal text-[var(--qf-ink-soft)]">#{r.id}</span>
                       </span>
                     ),
                   },
@@ -400,7 +413,21 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
                       </span>
                     ),
                   },
-                  { key: "n", header: "Net value", align: "right", hideOnMobile: true, cell: (r) => <span className="whitespace-nowrap"><MoneyDisplay value={r.net_value} /></span> },
+                  {
+                    key: "n",
+                    header: "Value",
+                    align: "right",
+                    hideOnMobile: true,
+                    cell: (r) => {
+                      const v = tradeHeadlineValue(r);
+                      return (
+                        <span className="whitespace-nowrap">
+                          <MoneyDisplay value={v.value} />
+                          <span className="block text-[12px] text-[var(--qf-ink-soft)]">{v.label.toLowerCase()}</span>
+                        </span>
+                      );
+                    },
+                  },
                   {
                     key: "st",
                     header: "Status",
@@ -419,7 +446,7 @@ export function TradesView({ initialStatus = "" }: { initialStatus?: string }) {
                           <Link
                             href={`${recordHref(poolId, "trades", r.id)}?edit=1`}
                             title="Edit trade (administrator correction)"
-                            aria-label={`Edit trade #${r.id}`}
+                            aria-label={`Edit ${r.symbol} trade of ${r.trade_date}`}
                             className="inline-flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-md border border-[var(--qf-line)] px-2.5 text-[13px] font-semibold text-[var(--qf-ink)] hover:border-[var(--qf-brass)] hover:bg-[var(--qf-cream-1)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--qf-brass)]"
                           >
                             <Pencil size={14} aria-hidden="true" />

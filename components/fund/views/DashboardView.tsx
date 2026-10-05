@@ -382,16 +382,20 @@ export function DashboardView() {
                 columns={[
                   { key: "s", header: "Instrument", primary: true, cell: (r) => `${instrumentLabel(r)} · ${PRODUCT_LABEL[r.product]}${r.direction === "SHORT" ? " · Short" : ""}` },
                   { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },
+                  { key: "x", header: "Exposure", align: "right", hideOnMobile: true, cell: (r) => <MoneyDisplay value={r.entryNotional} /> },
                   {
                     key: "p",
-                    header: "Last recorded price",
+                    header: "Recorded price",
                     align: "right",
-                    cell: (r) => (
-                      <span className="flex flex-col items-end gap-1">
-                        <MoneyDisplay value={r.price} dp={4} />
-                        <QualityBadge quality={r.priceQuality} stale={r.priceStale} />
-                      </span>
-                    ),
+                    cell: (r) =>
+                      r.price === null ? (
+                        <span className="whitespace-nowrap text-[12.5px] text-[var(--qf-ink-soft)]">Not priced yet</span>
+                      ) : (
+                        <span className="flex flex-col items-end gap-1">
+                          <MoneyDisplay value={r.price} dp={4} />
+                          <QualityBadge quality={r.priceQuality} stale={r.priceStale} />
+                        </span>
+                      ),
                   },
                   { key: "v", header: "Value", align: "right", cell: (r) => <MoneyDisplay value={r.marketValue} /> },
                   { key: "u", header: "Unrealized P&L", align: "right", cell: (r) => <MoneyDisplay value={r.unrealizedPnl} signed /> },
@@ -411,7 +415,7 @@ export function DashboardView() {
                   rowKey={(r) => r.id}
                   rowHref={(r) => recordHref(poolId, "trades", r.id)}
                   columns={[
-                    { key: "id", header: "Trade", primary: true, cell: (r) => `#${r.id} ${r.symbol}` },
+                    { key: "id", header: "Trade", primary: true, cell: (r) => r.symbol },
                     { key: "side", header: "Side", cell: (r) => <SideLabel side={r.side} /> },
                     { key: "d", header: "Date", cell: (r) => <DateDisplay value={r.tradeDate} /> },
                     { key: "st", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
@@ -429,8 +433,7 @@ export function DashboardView() {
                   rowKey={(r) => r.id}
                   rowHref={(r) => recordHref(poolId, "contributions", r.id)}
                   columns={[
-                    { key: "id", header: "Contribution", primary: true, cell: (r) => `#${r.id}` },
-                    { key: "m", header: "Member", cell: (r) => r.memberName },
+                    { key: "m", header: "Member", primary: true, cell: (r) => r.memberName },
                     { key: "a", header: "Amount", align: "right", cell: (r) => <MoneyDisplay value={r.amount} /> },
                     { key: "s", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },
                   ]}
@@ -440,7 +443,7 @@ export function DashboardView() {
           </div>
 
           {can("audit:view") && d.recentActivity && (
-            <SectionCard title="Recent activity" actions={<ViewAll href={`${base}/audit`} label="Audit log" />} flush>
+            <SectionCard title="Pool activity" actions={<ViewAll href={`${base}/audit`} label="Audit log" />} flush>
               <AuditTrail items={d.recentActivity} />
             </SectionCard>
           )}

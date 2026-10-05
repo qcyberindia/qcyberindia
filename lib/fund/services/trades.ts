@@ -103,6 +103,8 @@ export type TradeRecord = {
   stamp_duty: string;
   other_charges: string;
   net_value: string;
+  /** round2(quantity x price): the traded value / exposure, before charges. Display only. */
+  gross_value: string;
   status: TradeStatus;
   external_ref: string | null;
   notes: string | null;
@@ -125,7 +127,7 @@ const TRADE_SELECT = `
          t.trade_date::text AS trade_date, t.settlement_date::text AS settlement_date, t.side,
          t.quantity::text AS quantity, t.price::text AS price, t.brokerage::text AS brokerage, t.stt::text AS stt,
          t.gst::text AS gst, t.stamp_duty::text AS stamp_duty, t.other_charges::text AS other_charges,
-         t.net_value::text AS net_value, t.status, t.external_ref, t.notes, t.is_backdated, t.backdated_reason,
+         t.net_value::text AS net_value, round(t.quantity * t.price, 2)::text AS gross_value, t.status, t.external_ref, t.notes, t.is_backdated, t.backdated_reason,
          t.reversal_reason, t.created_by, t.created_at, t.executed_at, t.settled_at, t.reversed_at,
          t.corrected_at, t.correction_count
     FROM qfinera_fund_trades t
@@ -579,6 +581,10 @@ export type TradePreview = {
   realizedPnl: string | null;
   /** Why this execution would be refused, if it would. */
   problem: string | null;
+  /** Latest official NAV date; a trade dated on or before it is a backdated correction. */
+  latestOfficialNavDate: string | null;
+  /** True when executing on this date needs an administrator correction (reason + confirmation). */
+  backdated: boolean;
 };
 
 function snapshot(p: BookPosition): PositionSnapshot {
@@ -621,7 +627,15 @@ export async function previewTrade(
     charges: c.totalCharges,
   };
   const before = positionBeforeTrade(history, draft) ?? emptyBookPosition();
-  const base = { side, gross: c.gross.toDecimalString(2), totalCharges: c.totalCharges.toDecimalString(2), before: snapshot(before) };
+  const latestNav = await latestOfficialNavDate(db, ctx.fundId);
+  const base = {
+    side,
+    gross: c.gross.toDecimalString(2),
+    totalCharges: c.totalCharges.toDecimalString(2),
+    before: snapshot(before),
+    latestOfficialNavDate: latestNav,
+    backdated: latestNav !== null && input.tradeDate <= latestNav,
+  };
   try {
     assertNothingLaterOnMtmPosition(history, draft, instrument.symbol, "recorded");
     assertValidBook([...history, draft], new Map([[instrument.id, instrument.symbol]]));
@@ -944,6 +958,8 @@ export type TradeDetail = {
   audit: AuditRecord[] | null;
   /** Every correction, oldest first, with the values before and after. */
   revisions: TradeRevision[];
+  /** Latest official NAV date: a correction touching cash on or before it needs confirmation. */
+  latestOfficialNavDate: string | null;
 };
 
 export async function getTradeDetail(db: Db, actor: FundActor, fundId: number, id: number): Promise<TradeDetail> {
@@ -987,5 +1003,6 @@ export async function getTradeDetail(db: Db, actor: FundActor, fundId: number, i
     })),
     audit: hasPermission(actor, "audit:view") ? await loadEntityAudit(db, fundId, "trade", id) : null,
     revisions: await listTradeRevisions(db, fundId, id),
+    latestOfficialNavDate: await latestOfficialNavDate(db, fundId),
   };
 }

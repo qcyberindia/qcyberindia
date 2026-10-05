@@ -15,6 +15,7 @@ import { PageHeader, SectionCard, btnPrimary } from "@/components/fund/parts";
 import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
+import { editNeedsBackdateConfirm, isMarkToMarket } from "@/components/fund/trade-display";
 import { APPROVAL_SENT, ActionPanel, ApprovalNotice, AuditTrail, DetailGrid, StageTracker, isPendingApproval, type WorkflowAction } from "@/components/fund/workflow";
 import { SideLabel, ACTION_LABEL, InstrumentPicker, InstrumentSummary, PRODUCT_LABEL, type InstrumentKind } from "@/components/fund/views/shared";
 
@@ -33,7 +34,7 @@ const PRODUCT_KIND: Record<string, InstrumentKind> = { EQUITY_DELIVERY: "EQUITY"
  * values (revision + audit), re-derives positions and posts dated cash
  * adjustments; it refuses anything the normal trade rules would refuse.
  */
-function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; totalCharges: string; open: boolean; onClose: () => void; onDone: () => void }) {
+function EditTrade({ t, totalCharges, latestNav, open, onClose, onDone }: { t: Trade; totalCharges: string; latestNav: string | null; open: boolean; onClose: () => void; onDone: () => void }) {
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
   const proposing = useFund().role === "MANAGER";
@@ -60,13 +61,15 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
   const [reason, setReason] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverAskedConfirm, setServerAskedConfirm] = useState(false);
   const longOnly = product === "EQUITY_DELIVERY";
+  const showConfirm = serverAskedConfirm || editNeedsBackdateConfirm(t.trade_date, tradeDate, latestNav);
 
   return (
     <FormDialog
       open={open}
       onClose={onClose}
-      title={`Edit trade #${t.id}`}
+      title={`Edit ${t.symbol} trade`}
       description="Match the contract note. Previous values stay in the revision history and audit trail; positions, cash and P&L are recalculated."
       submitLabel={proposing ? "Send for approval" : "Save correction"}
       pending={pending}
@@ -84,7 +87,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
             externalRef: externalRef.trim() || undefined,
             notes: notes.trim() || undefined,
             reason: reason.trim(),
-            confirm,
+            confirm: showConfirm && confirm,
           });
           notify(
             "success",
@@ -97,6 +100,7 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
           onDone();
           onClose();
         } catch (err) {
+          if (/official NAV/i.test(errorMessage(err))) setServerAskedConfirm(true);
           setError(errorMessage(err));
         }
       }}
@@ -134,10 +138,15 @@ function EditTrade({ t, totalCharges, open, onClose, onDone }: { t: Trade; total
       <TextField label="Contract note / broker reference" value={externalRef} onChange={setExternalRef} maxLength={64} />
       <TextAreaField label="Notes" value={notes} onChange={setNotes} maxLength={1000} rows={2} />
       <TextAreaField label="Correction reason" value={reason} onChange={setReason} maxLength={500} rows={2} required hint="At least 10 characters. Shown in the revision history and audit trail." />
-      <label className="flex items-start gap-2 text-[13px]">
-        <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} className="mt-0.5 h-4 w-4" />
-        If this changes cash on or before the latest official NAV, I confirm the correction. Official NAVs already struck are kept unchanged.
-      </label>
+      {showConfirm && (
+        <fieldset className="space-y-2 rounded-md border border-[var(--qf-brass)]/50 p-3">
+          <legend className="px-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--qf-ink-soft)]">Administrator correction</legend>
+          <label className="flex items-start gap-2 text-[13px]">
+            <input type="checkbox" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} className="mt-0.5 h-4 w-4" />
+            This changes cash on or before the latest official NAV{latestNav ? ` (${latestNav})` : ""}. I confirm the backdated correction. Official NAVs already struck are kept unchanged.
+          </label>
+        </fieldset>
+      )}
     </FormDialog>
   );
 }
@@ -233,7 +242,7 @@ export function TradeDetail({ id, initialEdit = false }: { id: string; initialEd
     <>
       <PageHeader
         eyebrow={<Link href={`${poolBase(poolId)}/trades`} className="underline-offset-2 hover:underline">← Trades</Link>}
-        title={t ? `Trade #${t.id} · ${t.symbol}` : "Trade"}
+        title={t ? t.symbol : "Trade"}
         description={t ? `${PRODUCT_LABEL[t.product]} · ${ACTION_LABEL[t.position_action]} · ${formatCalendarDate(t.trade_date)}` : undefined}
         actions={
           canEdit ? (
@@ -270,10 +279,18 @@ export function TradeDetail({ id, initialEdit = false }: { id: string; initialEd
                 { label: "Settlement date", value: <DateDisplay value={t.settlement_date} /> },
                 { label: "Quantity", value: <QuantityDisplay value={t.quantity} /> },
                 { label: "Price", value: <MoneyDisplay value={t.price} dp={4} /> },
-                { label: "Gross", value: <MoneyDisplay value={d.computation.gross} /> },
+                { label: isMarkToMarket(t.product) ? "Exposure (quantity × price)" : "Traded value", value: <MoneyDisplay value={d.computation.gross} /> },
                 { label: "Estimated charges", value: <MoneyDisplay value={d.computation.totalCharges} /> },
-                { label: "Net value", value: <MoneyDisplay value={d.computation.net} /> },
-                { label: "Cash effect", value: <MoneyDisplay value={d.computation.cashDelta} signed /> },
+                ...(isMarkToMarket(t.product) ? [] : [{ label: "Net value", value: <MoneyDisplay value={d.computation.net} /> }]),
+                {
+                  label: "Cash impact",
+                  value: (
+                    <>
+                      <MoneyDisplay value={d.computation.cashDelta} signed />
+                      {isMarkToMarket(t.product) && <span className="block text-[12px] text-[var(--qf-ink-soft)]">Mark-to-market: charges on open, price difference on close. No margin is modelled.</span>}
+                    </>
+                  ),
+                },
                 { label: "Broker reference", value: t.external_ref ?? "—" },
                 { label: "Backdated", value: t.is_backdated ? `Yes: ${t.backdated_reason ?? ""}` : "No" },
                 { label: "Reversal reason", value: t.reversal_reason ?? "—" },
@@ -295,7 +312,7 @@ export function TradeDetail({ id, initialEdit = false }: { id: string; initialEd
                 rows={d.ledger}
                 rowKey={(r) => r.id}
                 columns={[
-                  { key: "t", header: "Entry", primary: true, cell: (r) => `${humanize(r.entryType)} #${r.id}` },
+                  { key: "t", header: "Entry", primary: true, cell: (r) => humanize(r.entryType) },
                   { key: "d", header: "Date", cell: (r) => <DateDisplay value={r.entryDate} /> },
                   { key: "c", header: "Cash", align: "right", cell: (r) => <MoneyDisplay value={r.cashDelta} signed /> },
                   { key: "b", header: "Backdated", cell: (r) => (r.isBackdated ? "Yes" : "No") },
@@ -303,7 +320,7 @@ export function TradeDetail({ id, initialEdit = false }: { id: string; initialEd
               />
             </SectionCard>
           )}
-          {canEdit && <EditTrade key={`${t.id}:${t.correction_count}:${editing}`} t={t} totalCharges={d.computation.totalCharges} open={editing} onClose={() => setEditing(false)} onDone={res.reload} />}
+          {canEdit && <EditTrade key={`${t.id}:${t.correction_count}:${editing}`} t={t} totalCharges={d.computation.totalCharges} latestNav={d.latestOfficialNavDate} open={editing} onClose={() => setEditing(false)} onDone={res.reload} />}
           {d.audit && (
             <SectionCard title="Audit trail" flush>
               <AuditTrail items={d.audit} />

@@ -127,7 +127,7 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
             <ul className="mt-1 list-disc pl-5 text-[var(--qf-down)]">
               {result.blocked.map((b) => (
                 <li key={`${b.kind}${b.id}`}>
-                  {humanize(b.kind)} #{b.id} still waiting: {b.reason}
+                  {humanize(b.kind)} still waiting: {b.reason}
                 </li>
               ))}
             </ul>
@@ -205,7 +205,7 @@ function DailyTab({ initialDate }: { initialDate: string | null }) {
                 rows={d.trades}
                 rowKey={(r) => r.id}
                 columns={[
-                  { key: "i", header: "Trade", primary: true, cell: (r) => `#${r.id} ${r.symbol} · ${r.exchange}` },
+                  { key: "i", header: "Trade", primary: true, cell: (r) => `${r.symbol} · ${r.exchange}` },
                   { key: "s", header: "Side", cell: (r) => <SideLabel side={r.side} /> },
                   { key: "q", header: "Quantity", align: "right", cell: (r) => <QuantityDisplay value={r.quantity} /> },
                   { key: "n", header: "Net value", align: "right", cell: (r) => <MoneyDisplay value={r.netValue} /> },

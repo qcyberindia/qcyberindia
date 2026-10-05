@@ -100,7 +100,7 @@ export function ExpensesView() {
                 rows={rows}
                 rowKey={(r) => r.id}
                 columns={[
-                  { key: "id", header: "Expense", primary: true, cell: (r) => `#${r.id} ${humanize(r.category)}` },
+                  { key: "id", header: "Expense", primary: true, cell: (r) => humanize(r.category) },
                   { key: "d", header: "Date", cell: (r) => <DateDisplay value={r.expense_date} /> },
                   { key: "a", header: "Amount", align: "right", cell: (r) => <MoneyDisplay value={r.amount} /> },
                   { key: "s", header: "Status", cell: (r) => <StatusBadge status={r.status} /> },

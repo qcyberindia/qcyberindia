@@ -147,12 +147,12 @@ function ChangeRequestCard({ r, onDecide, onCancel }: { r: ChangeRequestDto; onD
                 {" · "}
                 {section ? (
                   <Link href={recordHref(poolId, section, r.entityId)} className="underline underline-offset-2">
-                    {humanize(r.entityType)} #{r.entityId}
+                    View {humanize(r.entityType).toLowerCase()}
                   </Link>
                 ) : name ? (
                   name
                 ) : (
-                  `${humanize(r.entityType)} #${r.entityId}`
+                  humanize(r.entityType)
                 )}
               </>
             )}

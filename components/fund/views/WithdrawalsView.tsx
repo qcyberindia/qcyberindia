@@ -133,8 +133,7 @@ export function WithdrawalsView() {
                 rowKey={(r) => r.id}
                 rowHref={(r) => recordHref(poolId, "withdrawals", r.id)}
                 columns={[
-                  { key: "id", header: "Withdrawal", primary: true, cell: (r) => `#${r.id}` },
-                  { key: "m", header: "Member", cell: (r) => r.memberName },
+                  { key: "m", header: "Member", primary: true, cell: (r) => r.memberName },
                   {
                     key: "r",
                     header: "Requested",

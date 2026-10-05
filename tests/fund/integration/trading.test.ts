@@ -397,4 +397,23 @@ suite("trading: products, positions and P&L (real database)", () => {
     expect((await list("product=OPTIONS&phase=OPEN")).total).toBe(2);
     expect((await list("product=FUTURES&direction=LONG&phase=CLOSE")).total).toBe(1);
   });
+
+  it("display: preview flags backdating; a new trade after the NAV needs no correction reason", async () => {
+    const fresh = await preview(alice, poolA, { instrumentId: ids.TCS, product: "EQUITY_INTRADAY", action: "OPEN_LONG", quantity: "5", price: "2852.52" });
+    expect(fresh.body.data.preview).toMatchObject({ latestOfficialNavDate: "2026-09-01", backdated: false, gross: "14262.60" });
+    const old = await preview(alice, poolA, { instrumentId: ids.TCS, product: "EQUITY_INTRADAY", action: "OPEN_LONG", tradeDate: "2026-09-01", quantity: "5", price: "2852.52" });
+    expect(old.body.data.preview).toMatchObject({ backdated: true });
+    // Executing on/before the official NAV still demands reason + confirmation (safeguard unchanged).
+    const refused = await trade(alice, poolA, { instrumentId: ids.TCS, product: "EQUITY_DELIVERY", action: "OPEN_LONG", tradeDate: "2026-09-01", quantity: "1", price: "10" });
+    expect(refused.status).toBe(422);
+  });
+
+  it("display: trades carry exposure (gross_value) and positions carry entry exposure", async () => {
+    const list = (await json(await tradesRoute.GET(request(carol, `/api/qfinera/pools/${poolA}/trades?product=EQUITY_INTRADAY&instrument=${ids.INFY}`), P(poolA)))).body.data;
+    for (const t of list.trades as Array<{ quantity: string; price: string; gross_value: string }>) {
+      expect(t.gross_value).toMatch(/^\d+\.\d{2}$/);
+    }
+    const h = await holdings(carol, poolA);
+    for (const r of h.rows as Array<{ entryNotional: string }>) expect(r.entryNotional).toMatch(/^-?\d+\.\d{2}$/);
+  });
 });

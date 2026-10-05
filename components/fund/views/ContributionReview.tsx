@@ -315,7 +315,7 @@ export function ContributionReview({ d, onDone }: { d: ContributionDetailDto; on
               { label: "Units allocated", value: c.units_allocated ? <QuantityDisplay value={c.units_allocated} /> : "Not yet allocated" },
               { label: "Allocated at", value: c.finalized_at ? formatTimestampIst(c.finalized_at) : "—" },
               { label: "Residual (kept by pool)", value: c.residual ? `₹${c.residual}` : "—" },
-              { label: "Accounting reference", value: d.ledgerEntryId ? <span className="font-mono text-[13px]">Ledger #{d.ledgerEntryId}</span> : "—" },
+              { label: "Accounting reference", value: d.ledgerEntryId ? <span className="text-[13px]">Ledger entry {d.ledgerEntryId}</span> : "—" },
             ]}
           />
         </Section>
