@@ -53,6 +53,23 @@ The QCyberIndia admin can also `GET`/`POST /api/admin/qfinance/pools/purge` (adm
 
 Product-wide intelligence (`lib/watch`, tables `qfinera_watch_items`, `qfinera_watch_attachments`). Any signed-in active account reads published items and publishes; authors edit/archive/delete their own. `qfinance_users.platform_role` (set by the QCyberIndia admin on the user page) adds moderators: MANAGER archives directly and proposes edits/deletions of others' items (platform-scope change requests); ADMIN acts directly and reviews requests. Deletes are soft (`REMOVED`). Audit rows are in `qfinera_fund_audit_log` with `fund_id NULL`.
 
+## NAV status and Pool Chat
+
+- **NAV status** (`GET /nav/status`, dashboard and contributions page): the latest official NAV, the dates contributions/withdrawals are waiting for, and for ADMIN/MANAGER what blocks the next strike (cutoff not passed, missing closing price, open intraday position). "Finalize NAV" links to Reports → Daily report for that date (`/reports?date=YYYY-MM-DD`). Units are still allocated only by striking the official EOD NAV; nothing is automatic.
+- A NAV date cannot be struck while requests wait for an **earlier** un-struck date: that date must be struck first, otherwise its requests would fall behind the latest official NAV and need a backdated correction.
+- **Pool Chat** (`/qfinera/pools/[poolId]/chat`, table `qfinera_fund_messages`, migration 016): every active member, VIEWER included, reads and posts (`chat:view`, `chat:post`). Authors edit/delete their own messages; ADMIN (`chat:moderate`) removes others' with a reason, audited as `chat.message_removed`. Plain text, 2000 characters, 20 messages per person per minute. New messages arrive by polling every 8 s while the tab is visible (no push).
+
+## Payment proof uploads and the reverse proxy
+
+Proofs are stored in PostgreSQL (`qfinera_fund_contribution_proofs.data`), never on disk or behind a public URL, and served only through the authorized proof route. The app uploads them as `multipart/form-data` and shrinks large images in the browser to under ~900 KB, but a PDF can be up to 2 MB. Nginx rejects bodies over **1 MB by default** (HTTP 413) before the app sees them, so allow a little more for the QFinera API:
+
+```
+location /api/qfinera/ {
+    client_max_body_size 4m;
+    # ...existing proxy_pass settings
+}
+```
+
 ## Market data
 
 There is no live market data and none is planned for this phase. Prices are recorded by the pool (`manual` provider) and labelled with their date and quality ("Recorded", "Closing price", "Recent", "Stale"); the UI never says "Live".
@@ -66,6 +83,7 @@ There is no live market data and none is planned for this phase. Prices are reco
 | 009 `qfinera_pools` | New; required (participation gate, `removed` memberships, pool-scoped append-only prices, one open withdrawal per member) |
 | 010–014 | Auth, instrument master, positions/derivatives, proofs/corrections |
 | 015 `qfinera_roles_approvals_deletion_watch` | VIEWER role, join requests, change requests, pool soft deletion + purge guard, platform role, Global Watch |
+| 016 `qfinera_pool_chat` | Pool Chat messages |
 
 All are additive, idempotent and transactional. Apply **manually**, in order, after a backup:
 
@@ -74,6 +92,7 @@ psql "$DATABASE_URL" -f db/migrations/008_qfinera_fund_workflow.sql
 psql "$DATABASE_URL" -f db/migrations/009_qfinera_pools.sql
 # ...
 psql "$DATABASE_URL" -f db/migrations/015_qfinera_roles_approvals_deletion_watch.sql
+psql "$DATABASE_URL" -f db/migrations/016_qfinera_pool_chat.sql
 ```
 
 Nothing applies migrations automatically.

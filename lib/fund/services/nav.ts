@@ -285,6 +285,90 @@ async function listAwaiting(db: Db, fundId: number, nav: NavCutoffConfig): Promi
   return out.sort((a, b) => (a.navDate === b.navDate ? a.id - b.id : a.navDate < b.navDate ? -1 : 1));
 }
 
+/** Earlier NAV dates that awaiting requests are due at and that have no official NAV. */
+async function unstruckEarlierDates(db: Db, fundId: number, date: string, nav: NavCutoffConfig): Promise<string[]> {
+  const dates = [...new Set((await listAwaiting(db, fundId, nav)).filter((a) => a.navDate < date).map((a) => a.navDate))];
+  const out: string[] = [];
+  for (const d of dates) if (!(await getOfficialSnapshot(db, fundId, d))) out.push(d);
+  return out;
+}
+
+// ---------------------------------------------------------------- status
+
+export type NavStatusDate = {
+  navDate: string;
+  contributions: number;
+  withdrawals: number;
+  /** The caller's own requests due at this date. */
+  mine: number;
+  official: { nav: string; createdAt: Date } | null;
+  isTradingDay: boolean;
+  cutoffAt: string;
+  cutoffPassed: boolean;
+};
+
+export type NavStatus = {
+  today: string;
+  latest: NavSnapshotRow | null;
+  /** Dates that awaiting requests are due at, oldest first. */
+  due: NavStatusDate[];
+  /** The date to strike next: the oldest un-struck due date. */
+  next: NavStatusDate | null;
+  /**
+   * For roles that strike (or propose) the NAV: what blocks striking `next`
+   * now. Null for everyone else, and when nothing is due.
+   */
+  readiness: { problems: string[]; nav: string | null; dueCount: number } | null;
+};
+
+/**
+ * Where the pool's NAV stands, for every member: the latest official NAV,
+ * the dates requests are waiting for, and (for ADMIN/MANAGER) why the next
+ * one cannot be struck yet. Writes nothing.
+ */
+export async function navStatus(
+  db: Db,
+  fundId: number,
+  viewer: { userId: number; canStrike: boolean },
+  now: Date = new Date()
+): Promise<NavStatus> {
+  const settings = await loadSettings(db, fundId);
+  const [latestDate, awaiting] = await Promise.all([latestOfficialNavDate(db, fundId), listAwaiting(db, fundId, settings.nav)]);
+  const latest = latestDate ? await getOfficialSnapshot(db, fundId, latestDate) : null;
+
+  const byDate = new Map<string, NavStatusDate>();
+  for (const a of awaiting) {
+    let d = byDate.get(a.navDate);
+    if (!d) {
+      const issues = navDateIssues(a.navDate, settings.nav, now);
+      const official = await getOfficialSnapshot(db, fundId, a.navDate);
+      d = {
+        navDate: a.navDate,
+        contributions: 0,
+        withdrawals: 0,
+        mine: 0,
+        official: official ? { nav: official.nav, createdAt: official.createdAt } : null,
+        isTradingDay: issues.isTradingDay,
+        cutoffAt: issues.cutoffAt.toISOString(),
+        cutoffPassed: issues.cutoffPassed,
+      };
+      byDate.set(a.navDate, d);
+    }
+    if (a.kind === "contribution") d.contributions += 1;
+    else d.withdrawals += 1;
+    if (a.memberId === viewer.userId) d.mine += 1;
+  }
+  const due = [...byDate.values()].sort((a, b) => (a.navDate < b.navDate ? -1 : 1));
+  const next = due.find((d) => !d.official) ?? null;
+
+  let readiness: NavStatus["readiness"] = null;
+  if (viewer.canStrike && next) {
+    const preview = await previewNav(db, fundId, next.navDate, now);
+    readiness = { problems: preview.problems, nav: preview.result?.nav ?? null, dueCount: preview.dueOnDate.length };
+  }
+  return { today: todayIst(now), latest, due, next, readiness };
+}
+
 // ---------------------------------------------------------------- preview
 
 export type NavPreview = NavComputation & {
@@ -322,7 +406,13 @@ export async function previewNav(db: Db, fundId: number, date: string, now: Date
 
   const problems = [...computation.problems];
   if (!issues.isTradingDay) problems.unshift(`${date} is not a trading day.`);
-  else if (!issues.cutoffPassed) problems.unshift(`The NAV cutoff for ${date} has not passed yet.`);
+  else if (!issues.cutoffPassed) {
+    problems.unshift(
+      `The NAV for ${date} can be struck after its cutoff, ${settings.nav.cutoffTimeIst} IST, once that day's closing prices are recorded.`
+    );
+  }
+  const unstruck = await unstruckEarlierDates(db, fundId, date, settings.nav);
+  if (unstruck.length > 0) problems.push(`Requests are still waiting for the official NAV of ${unstruck.join(", ")}. Strike ${unstruck[0]} first.`);
 
   return {
     ...computation,
@@ -391,6 +481,16 @@ export async function strikeNav(ctx: ServiceCtx, input: StrikeInput, now: Date =
           { correctionReason: "Reason and confirmation required" }
         );
       }
+    }
+    // Requests due at an EARLIER date whose NAV was never struck must be
+    // finalized at that date's NAV. Striking a later date first would push
+    // that date behind the latest official NAV, where only a backdated
+    // correction could reach it, so the earlier date has to go first.
+    const unstruck = await unstruckEarlierDates(db, ctx.fundId, input.date, settings.nav);
+    if (unstruck.length > 0) {
+      throw conflictError(
+        `Requests are still waiting for the official NAV of ${unstruck.join(", ")}. Strike ${unstruck[0]} first, then ${input.date}.`
+      );
     }
     if (existing) {
       const used = await one<{ n: number }>(

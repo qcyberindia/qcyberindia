@@ -11,7 +11,7 @@ import { safeHttpUrl } from "@/components/fund/common";
 import { TextAreaField } from "@/components/fund/forms";
 import { Modal } from "@/components/fund/overlays";
 import { ErrorState, LoadingSkeleton, btnDanger, btnPrimary, btnSecondary } from "@/components/fund/parts";
-import { ProofDropzone, formatBytes, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
+import { ProofDropzone, formatBytes, prepareProofFile, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
 import { APPROVAL_SENT, ApprovalNotice } from "@/components/fund/workflow";
 import { CategoryTag, LINK_ICON, LINK_KIND_LABEL, relativeDate } from "@/components/watch/shared";
 
@@ -193,7 +193,7 @@ export function WatchDetail({ id }: { id: number }) {
                       onClick={async () => {
                         setBusy(true);
                         try {
-                          await apiFetch(`/api/qfinera/watch/${item.id}/attachments`, { body: { fileName: file.name, data: await readFileBase64(file) } });
+                          await apiFetch(`/api/qfinera/watch/${item.id}/attachments`, { body: { fileName: file.name, data: await readFileBase64(await prepareProofFile(file)) } });
                           setFile(null);
                           load();
                         } catch (err) {

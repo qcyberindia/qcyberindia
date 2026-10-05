@@ -8,7 +8,9 @@
 //
 // Roles, least to most privileged:
 //   VIEWER   read-only: sees the pool and its own records; can ask to become
-//            a MEMBER (join request). Never creates or changes anything.
+//            a MEMBER (join request). Never creates or changes a record.
+//            The one exception is Pool Chat: every active participant,
+//            VIEWER included, may read and post in the pool's private chat.
 //   MEMBER   own contributions/withdrawals, comments, own watchlist notes.
 //   MANAGER  operational: records trades, expenses and contributions for
 //            members, and PROPOSES every ADMIN-only change (approvals,
@@ -36,6 +38,8 @@ export type FundPermission =
   | "watchlist:view"
   | "watchlist:comment"
   | "reports:view"
+  | "chat:view"
+  | "chat:post"
   // VIEWER only
   | "members:request_join"
   // MEMBER and above
@@ -71,6 +75,7 @@ export type FundPermission =
   | "corrections:backdate"
   | "exports:run"
   | "requests:review"
+  | "chat:moderate"
   | "pool:delete";
 
 const VIEWER_PERMISSIONS: readonly FundPermission[] = [
@@ -83,6 +88,9 @@ const VIEWER_PERMISSIONS: readonly FundPermission[] = [
   "nav:view",
   "watchlist:view",
   "reports:view",
+  // Pool Chat is open to every active participant, VIEWER included.
+  "chat:view",
+  "chat:post",
 ];
 
 const MEMBER_PERMISSIONS: readonly FundPermission[] = [
@@ -127,6 +135,7 @@ const ADMIN_EXTRA: readonly FundPermission[] = [
   "corrections:backdate",
   "exports:run",
   "requests:review",
+  "chat:moderate",
   "pool:delete",
 ];
 

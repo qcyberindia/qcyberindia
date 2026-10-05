@@ -19,15 +19,20 @@ export function fundIdFrom(req: NextRequest): number | null {
  * SameSite=Lax, which already blocks most cross-site POSTs):
  *   1. the body must be JSON, so a plain cross-site <form> cannot send it, and
  *      a cross-site fetch needs a CORS preflight this API never approves;
+ *      (Proof uploads may be multipart/form-data, but then step 2 is mandatory.)
  *   2. if the browser sent an Origin header, its host must be one of this
  *      request's own hosts (Host / X-Forwarded-Host behind the reverse proxy).
  */
-export function assertJsonMutation(req: NextRequest): void {
+export function assertJsonMutation(req: NextRequest, opts: { allowMultipart?: boolean } = {}): void {
   const type = (req.headers.get("content-type") ?? "").toLowerCase();
-  if (!type.startsWith("application/json")) {
+  const multipartOk = opts.allowMultipart === true && type.startsWith("multipart/form-data");
+  if (!type.startsWith("application/json") && !multipartOk) {
     throw new FundError("VALIDATION", "Requests must be sent as JSON.", 415);
   }
   const origin = req.headers.get("origin");
+  // A cross-site <form> CAN send multipart, so a multipart upload must also
+  // prove it comes from this site: browsers always send Origin on a POST fetch.
+  if (!origin && multipartOk) throw new FundError("FORBIDDEN", "Cross-origin requests are not allowed.", 403);
   if (!origin) return;
 
   let originHost: string;

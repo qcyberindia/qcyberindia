@@ -17,6 +17,7 @@ import { useCan, useFund } from "@/components/fund/session";
 import { DataTable } from "@/components/fund/table";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import { AuditTrail } from "@/components/fund/workflow";
+import { NavStatusCard } from "@/components/fund/views/NavStatusCard";
 import { SideLabel, PRODUCT_LABEL, instrumentLabel } from "@/components/fund/views/shared";
 
 function ViewAll({ href, label }: { href: string; label: string }) {
@@ -286,6 +287,8 @@ export function DashboardView() {
       ) : !d ? null : (
         <div className="space-y-6">
           {can("members:request_join") && <JoinBanner />}
+
+          <NavStatusCard />
 
           {((d.pending.approvals ?? 0) > 0 || (d.pending.joinRequests ?? 0) > 0) && (
             <Link

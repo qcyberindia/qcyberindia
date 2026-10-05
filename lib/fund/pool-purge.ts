@@ -29,6 +29,7 @@ export const PURGE_STEPS: ReadonlyArray<{ table: string; sql: string }> = [
            WHERE watchlist_item_id IN (SELECT id FROM qfinera_fund_watchlist_items WHERE fund_id = $1)`,
   },
   { table: "qfinera_fund_watchlist_items", sql: "DELETE FROM qfinera_fund_watchlist_items WHERE fund_id = $1" },
+  { table: "qfinera_fund_messages", sql: "DELETE FROM qfinera_fund_messages WHERE fund_id = $1" },
   { table: "qfinera_fund_contribution_proofs", sql: "DELETE FROM qfinera_fund_contribution_proofs WHERE fund_id = $1" },
   { table: "qfinera_fund_trade_revisions", sql: "DELETE FROM qfinera_fund_trade_revisions WHERE fund_id = $1" },
   { table: "qfinera_fund_ledger_entries", sql: "DELETE FROM qfinera_fund_ledger_entries WHERE fund_id = $1" },

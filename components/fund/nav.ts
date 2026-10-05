@@ -17,6 +17,7 @@ export type NavIcon =
   | "trades"
   | "holdings"
   | "watchlist"
+  | "chat"
   | "expenses"
   | "reports"
   | "audit"
@@ -34,6 +35,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { segment: "trades", label: "Trades", icon: "trades", permission: "trades:view" },
   { segment: "holdings", label: "Positions", icon: "holdings", permission: "holdings:view" },
   { segment: "watchlist", label: "Watchlist", icon: "watchlist", permission: "watchlist:view" },
+  { segment: "chat", label: "Chat", icon: "chat", permission: "chat:view" },
   { segment: "expenses", label: "Expenses", icon: "expenses", permission: "expenses:view" },
   { segment: "reports", label: "Reports", icon: "reports", permission: "reports:view" },
   { segment: "approvals", label: "Approvals", icon: "approvals", permission: "requests:view" },

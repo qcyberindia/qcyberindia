@@ -18,6 +18,7 @@ import {
   Users,
   BookOpen,
   ClipboardCheck,
+  MessagesSquare,
 } from "lucide-react";
 import QFinanceHeader from "@/components/qfinance/QFinanceHeader";
 import { Drawer } from "@/components/fund/overlays";
@@ -35,6 +36,7 @@ const ICONS: Record<NavIcon, typeof Users> = {
   trades: ArrowLeftRight,
   holdings: Briefcase,
   watchlist: Eye,
+  chat: MessagesSquare,
   expenses: Receipt,
   reports: FileText,
   audit: ScrollText,

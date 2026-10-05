@@ -52,6 +52,9 @@ export const UI_PERMISSIONS = [
   "requests:create",
   "requests:review",
   "pool:delete",
+  "chat:view",
+  "chat:post",
+  "chat:moderate",
 ] as const satisfies readonly FundPermission[];
 
 export type UiPermission = (typeof UI_PERMISSIONS)[number];

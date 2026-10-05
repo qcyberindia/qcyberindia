@@ -18,6 +18,9 @@ function detail(status: string, memberId = 7, awaiting: ContributionDetailDto["a
     awaiting,
     audit: null,
     proofs: [],
+    approvedByName: null,
+    fundsConfirmedByName: null,
+    ledgerEntryId: null,
   };
 }
 const keys = (d: ContributionDetailDto, role: Role, userId = 1) => contributionActions(d, can(role), userId).map((a) => a.key);

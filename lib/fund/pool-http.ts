@@ -36,10 +36,10 @@ export async function poolRoute(
   req: NextRequest,
   params: Promise<{ poolId: string; id?: string }>,
   handler: (args: PoolHandlerArgs) => Promise<Response>,
-  opts: { mutation?: boolean } = {}
+  opts: { mutation?: boolean; allowMultipart?: boolean } = {}
 ): Promise<Response> {
   try {
-    if (opts.mutation) assertJsonMutation(req);
+    if (opts.mutation) assertJsonMutation(req, { allowMultipart: opts.allowMultipart });
     const p = await params;
     const poolId = parsePoolId(p.poolId);
     const ctx = await requireFundContext(req, poolId);

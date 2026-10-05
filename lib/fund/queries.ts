@@ -670,6 +670,11 @@ export type ContributionDetail = {
   audit: AuditRecord[] | null;
   /** Payment proof files (metadata only; bytes come from the proof route). */
   proofs: ProofMeta[];
+  /** Who took each review step (display names). */
+  approvedByName: string | null;
+  fundsConfirmedByName: string | null;
+  /** The ledger entry that posted the allocation, once finalized. */
+  ledgerEntryId: number | null;
 };
 
 export async function getContributionDetail(db: Db, ctx: FundContext, id: number): Promise<ContributionDetail> {
@@ -698,8 +703,30 @@ export async function getContributionDetail(db: Db, ctx: FundContext, id: number
     ? await loadEntityAudit(db, ctx.fund.id, "contribution", id)
     : null;
 
-  const proofs = await listContributionProofs(db, ctx.fund.id, id);
-  return { contribution: row, memberName: user?.display_name ?? "Unknown member", awaiting, audit, proofs };
+  const [proofs, names, ledger] = await Promise.all([
+    listContributionProofs(db, ctx.fund.id, id),
+    db.query<{ id: number; display_name: string }>("SELECT id, display_name FROM qfinance_users WHERE id = ANY($1::int[])", [
+      [row.approved_by, row.funds_confirmed_by].filter((x): x is number => x !== null),
+    ]),
+    one<{ id: number }>(
+      db,
+      `SELECT id FROM qfinera_fund_ledger_entries
+        WHERE fund_id = $1 AND reference_table = 'qfinera_fund_contributions' AND reference_id = $2 AND entry_type = 'CONTRIBUTION'
+        ORDER BY id LIMIT 1`,
+      [ctx.fund.id, id]
+    ),
+  ]);
+  const nameOf = (uid: number | null) => (uid === null ? null : (names.rows.find((n) => n.id === uid)?.display_name ?? null));
+  return {
+    contribution: row,
+    memberName: user?.display_name ?? "Unknown member",
+    awaiting,
+    audit,
+    proofs,
+    approvedByName: nameOf(row.approved_by),
+    fundsConfirmedByName: nameOf(row.funds_confirmed_by),
+    ledgerEntryId: ledger?.id ?? null,
+  };
 }
 
 // ------------------------------------------------------------ members

@@ -60,14 +60,18 @@ export function cleanFileName(raw: string): string {
   return cleaned || "proof";
 }
 
+/** Size checks shared by both upload encodings. */
+export function checkProofSize(bytes: Buffer): Buffer {
+  if (bytes.length === 0) throw validationError("The file is empty.", { file: "Empty file" });
+  if (bytes.length > MAX_PROOF_BYTES) throw validationError("The file is larger than 2 MB.", { file: "Larger than 2 MB" });
+  return bytes;
+}
+
 /** Decodes base64 strictly. */
 export function decodeProof(dataBase64: string): Buffer {
   const b64 = dataBase64.replace(/^data:[^;]+;base64,/, "");
   if (!/^[A-Za-z0-9+/]+={0,2}$/.test(b64)) throw validationError("The file could not be read.", { file: "Invalid file data" });
-  const bytes = Buffer.from(b64, "base64");
-  if (bytes.length === 0) throw validationError("The file is empty.", { file: "Empty file" });
-  if (bytes.length > MAX_PROOF_BYTES) throw validationError("The file is larger than 2 MB.", { file: "Larger than 2 MB" });
-  return bytes;
+  return checkProofSize(Buffer.from(b64, "base64"));
 }
 
 async function loadContribution(db: Db, fundId: number, id: number) {
@@ -85,9 +89,9 @@ function canSee(actor: FundActor, memberId: number): boolean {
 export async function addContributionProof(
   ctx: ServiceCtx,
   contributionId: number,
-  input: { fileName: string; dataBase64: string; kind: ProofKind }
+  input: { fileName: string; kind: ProofKind } & ({ dataBase64: string } | { bytes: Buffer })
 ): Promise<ProofMeta> {
-  const bytes = decodeProof(input.dataBase64);
+  const bytes = "bytes" in input ? checkProofSize(input.bytes) : decodeProof(input.dataBase64);
   const contentType = sniffProofType(bytes);
   if (!contentType) {
     throw validationError("Upload a PNG, JPEG or WebP screenshot, or a PDF.", { file: "Unsupported file type" });

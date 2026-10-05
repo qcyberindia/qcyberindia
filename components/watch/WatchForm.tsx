@@ -9,7 +9,7 @@ import { Plus, Trash2, X } from "lucide-react";
 import { apiFetch, errorMessage, type InstrumentDto, type WatchItemDetailDto } from "@/components/fund/api";
 import { SelectField, TextAreaField, TextField, inputClass } from "@/components/fund/forms";
 import { btnPrimary, btnSecondary } from "@/components/fund/parts";
-import { ProofDropzone, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
+import { ProofDropzone, prepareProofFile, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
 import { ApprovalNotice } from "@/components/fund/workflow";
 import { CATEGORIES, CATEGORY_HINT, CATEGORY_LABEL, LINK_KIND_LABEL } from "@/components/watch/shared";
 
@@ -137,7 +137,7 @@ export function WatchForm({ item, proposing = false }: { item?: WatchItemDetailD
       } else {
         const r = await apiFetch<{ item: { id: number } }>("/api/qfinera/watch", { body });
         for (const f of files) {
-          await apiFetch(`/api/qfinera/watch/${r.item.id}/attachments`, { body: { fileName: f.name, data: await readFileBase64(f) } });
+          await apiFetch(`/api/qfinera/watch/${r.item.id}/attachments`, { body: { fileName: f.name, data: await readFileBase64(await prepareProofFile(f)) } });
         }
         router.push(`/qfinera/watch/${r.item.id}`);
       }

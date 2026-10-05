@@ -14,8 +14,7 @@ import { useNotice } from "@/components/fund/notices";
 import { btnSecondary } from "@/components/fund/parts";
 import type { UiPermission } from "@/components/fund/permissions";
 import { useCanAct, useFund } from "@/components/fund/session";
-import { ProofDropzone, formatBytes, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
-import { usePoolMutation } from "@/components/fund/useResource";
+import { ProofDropzone, formatBytes, proofFileProblem, uploadProof } from "@/components/fund/upload";
 import { ActionBar, StepIndicator, type WorkflowAction } from "@/components/fund/workflow";
 
 export const PAYMENT_METHOD_LABEL: Record<string, string> = {
@@ -156,7 +155,8 @@ function ProofList({ proofs, url, empty }: { proofs: Proof[]; url: (id: number) 
 }
 
 function AttachProof({ contributionId, kind, label, hint, onDone }: { contributionId: number; kind: "PAYMENT" | "RECEIVED"; label: string; hint: string; onDone: () => void }) {
-  const { run, pending } = usePoolMutation();
+  const { poolId } = useFund();
+  const [pending, setPending] = useState(false);
   const { notify } = useNotice();
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -169,13 +169,17 @@ function AttachProof({ contributionId, kind, label, hint, onDone }: { contributi
           className={btnSecondary}
           disabled={proofFileProblem(file) !== null || pending}
           onClick={async () => {
+            if (pending) return;
+            setPending(true);
             try {
-              await run(`contributions/${contributionId}/proofs`, { fileName: file.name, dataBase64: await readFileBase64(file), kind });
+              await uploadProof(poolApi(poolId, `contributions/${contributionId}/proofs`), file, kind);
               notify("success", kind === "PAYMENT" ? "Payment proof attached." : "Received proof attached.");
               setFile(null);
               onDone();
             } catch (err) {
               setError(errorMessage(err));
+            } finally {
+              setPending(false);
             }
           }}
         >
@@ -285,16 +289,33 @@ export function ContributionReview({ d, onDone }: { d: ContributionDetailDto; on
         </Section>
       )}
 
+      {(c.approved_at || c.funds_confirmed_at) && (
+        <Section title="Review">
+          <Facts
+            items={[
+              { label: "Approved by", value: d.approvedByName ?? "—" },
+              { label: "Approved at", value: c.approved_at ? formatTimestampIst(c.approved_at) : "—" },
+              { label: "Funds confirmed by", value: d.fundsConfirmedByName ?? "—" },
+              { label: "Funds confirmed at", value: c.funds_confirmed_at ? formatTimestampIst(c.funds_confirmed_at) : "—" },
+            ]}
+          />
+        </Section>
+      )}
+
       {(c.status === "AWAITING_NAV" || c.status === "FINALIZED") && (
         <Section title="Allocation">
           <Facts
             items={[
-              { label: "Funds confirmed", value: c.funds_confirmed_at ? formatTimestampIst(c.funds_confirmed_at) : "—" },
+              { label: "Status", value: c.status === "FINALIZED" ? "Allocated" : "Awaiting NAV" },
               { label: "NAV date", value: <DateDisplay value={c.effective_date ?? d.awaiting?.navDate} /> },
-              { label: "NAV used", value: <MoneyDisplay value={c.nav_used} dp={4} /> },
-              { label: "Units allocated", value: <QuantityDisplay value={c.units_allocated} /> },
+              {
+                label: "NAV used",
+                value: c.nav_used ? <MoneyDisplay value={c.nav_used} dp={4} /> : d.awaiting?.navOfficial ? "Official, not yet applied" : "Awaiting official NAV",
+              },
+              { label: "Units allocated", value: c.units_allocated ? <QuantityDisplay value={c.units_allocated} /> : "Not yet allocated" },
+              { label: "Allocated at", value: c.finalized_at ? formatTimestampIst(c.finalized_at) : "—" },
               { label: "Residual (kept by pool)", value: c.residual ? `₹${c.residual}` : "—" },
-              { label: "Finalized", value: c.finalized_at ? formatTimestampIst(c.finalized_at) : "—" },
+              { label: "Accounting reference", value: d.ledgerEntryId ? <span className="font-mono text-[13px]">Ledger #{d.ledgerEntryId}</span> : "—" },
             ]}
           />
         </Section>

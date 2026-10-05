@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { errorMessage, type Daily, type Member, type PositionsReportDto, type NavSnapshot, type Statement, type StrikeResultDto } from "@/components/fund/api";
 import { resourceState } from "@/components/fund/common";
@@ -164,8 +165,8 @@ function StrikePanel({ daily, onDone }: { daily: Daily; onDone: () => void }) {
   );
 }
 
-function DailyTab() {
-  const [date, setDate] = useState(todayIstInput());
+function DailyTab({ initialDate }: { initialDate: string | null }) {
+  const [date, setDate] = useState(initialDate ?? todayIstInput());
   const res = usePoolResource<Daily>("reports", { type: "daily", date });
   const state = resourceState(res, "the daily report");
   const d = res.data;
@@ -439,6 +440,9 @@ function PositionsTab() {
 }
 
 export function ReportsView() {
+  // ?date=YYYY-MM-DD opens the daily report (and the NAV strike) for that date.
+  const asked = useSearchParams().get("date");
+  const initialDate = asked && /^\d{4}-\d{2}-\d{2}$/.test(asked) ? asked : null;
   const [tab, setTab] = useState<Tab>("daily");
   return (
     <>
@@ -462,7 +466,7 @@ export function ReportsView() {
         ))}
       </div>
       <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        {tab === "daily" && <DailyTab />}
+        {tab === "daily" && <DailyTab initialDate={initialDate} />}
         {tab === "nav-history" && <NavHistoryTab />}
         {tab === "statement" && <StatementTab />}
         {tab === "positions" && <PositionsTab />}

@@ -12,7 +12,8 @@ import type { WatchlistComment, WatchlistItem } from "@/lib/fund/services/watchl
 import type { InviteRow, InvitePreview } from "@/lib/fund/services/invites";
 import type { PoolSummary } from "@/lib/fund/services/pools";
 import type { FundSettingsView } from "@/lib/fund/services/settings";
-import type { NavPreview, NavSnapshotRow, StrikeResult } from "@/lib/fund/services/nav";
+import type { NavPreview, NavSnapshotRow, NavStatus, StrikeResult } from "@/lib/fund/services/nav";
+import type { ChatMessage, ChatPage } from "@/lib/fund/services/chat";
 import type { DailyReport, StatementReport, positionsReport } from "@/lib/fund/services/reports";
 import type { Quote } from "@/lib/market-data";
 import type { ChangeRequest } from "@/lib/fund/change-request-store";
@@ -46,11 +47,14 @@ export type InstrumentDto = Instrument;
 export type RecordedPriceDto = Jsonify<RecordedPrice>;
 export type WatchItem = Jsonify<WatchlistItem>;
 export type WatchComment = Jsonify<WatchlistComment>;
+export type ChatMessageDto = Jsonify<ChatMessage>;
+export type ChatPageDto = Jsonify<ChatPage>;
 export type Invite = Jsonify<InviteRow>;
 export type InvitePreviewDto = Jsonify<InvitePreview>;
 export type Pool = Jsonify<PoolSummary>;
 export type Settings = Jsonify<FundSettingsView>;
 export type NavPreviewDto = Jsonify<NavPreview>;
+export type NavStatusDto = Jsonify<NavStatus>;
 export type NavSnapshot = Jsonify<NavSnapshotRow>;
 export type StrikeResultDto = Jsonify<StrikeResult>;
 export type Daily = Jsonify<DailyReport>;
@@ -109,6 +113,15 @@ export async function apiFetch<T>(
   } catch (err) {
     if ((err as { name?: string })?.name === "AbortError") throw err;
     throw new ApiError("NETWORK", "Could not reach the server. Check your connection and try again.", 0);
+  }
+  return readApiResponse<T>(res);
+}
+
+/** Unwraps the API envelope, or throws ApiError with the server's safe message. */
+export async function readApiResponse<T>(res: Response): Promise<T> {
+  // A reverse proxy rejects an oversized body before the app sees it (HTML, not JSON).
+  if (res.status === 413) {
+    throw new ApiError("TOO_LARGE", "The server refused the file because it is too large. Use a smaller screenshot or PDF (under 1 MB).", 413);
   }
   let payload: unknown = null;
   try {

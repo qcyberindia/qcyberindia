@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
-import { errorMessage, type Contribution, type ContributionDetailDto, type Member, type Paged } from "@/components/fund/api";
+import { errorMessage, poolApi, type Contribution, type ContributionDetailDto, type Member, type Paged } from "@/components/fund/api";
 import { isPositiveDecimal, resourceState } from "@/components/fund/common";
 import { DateDisplay, MoneyDisplay, QuantityDisplay, StatusBadge } from "@/components/fund/display";
 import { DecimalField, SelectField, TextAreaField, TextField, inputClass } from "@/components/fund/forms";
@@ -12,10 +12,11 @@ import { Drawer, FormDialog } from "@/components/fund/overlays";
 import { EmptyState, PageHeader, SectionCard, btnPrimary, btnSecondary } from "@/components/fund/parts";
 import { useCanAct, useFund } from "@/components/fund/session";
 import { DataTable, FilterBar, FilterField, Pagination } from "@/components/fund/table";
-import { ProofDropzone, proofFileProblem, readFileBase64 } from "@/components/fund/upload";
+import { ProofDropzone, proofFileProblem, uploadProof } from "@/components/fund/upload";
 import { usePoolMutation, usePoolResource } from "@/components/fund/useResource";
 import { todayIstInput } from "@/components/fund/views/shared";
 import { ContributionReview, ContributionReviewActions, PAYMENT_METHOD_LABEL } from "@/components/fund/views/ContributionReview";
+import { NavStatusCard } from "@/components/fund/views/NavStatusCard";
 
 const STATUSES = ["PENDING", "APPROVED", "AWAITING_NAV", "FINALIZED", "REJECTED", "CANCELLED"];
 const STATUS_LABEL: Record<string, string> = {
@@ -27,9 +28,10 @@ const STATUS_LABEL: Record<string, string> = {
   CANCELLED: "Cancelled",
 };
 
-function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: (retryProofFor?: number) => void }) {
   const can = useCanAct();
-  const { userId } = useFund();
+  const { userId, poolId } = useFund();
+  const [uploading, setUploading] = useState(false);
   const members = usePoolResource<{ members: Member[] }>(open && can("contributions:create_for_member") ? "members" : null);
   const { run, pending } = usePoolMutation();
   const { notify } = useNotice();
@@ -51,7 +53,7 @@ function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: ()
       title="Record a contribution"
       description="For a payment already made to the pool's bank account."
       submitLabel="Submit for review"
-      pending={pending}
+      pending={pending || uploading}
       error={error}
       onSubmit={async () => {
         setError(null);
@@ -70,13 +72,18 @@ function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: ()
             memberId: forSomeoneElse ? Number(memberId) : undefined,
           });
           if (file) {
+            setUploading(true);
             try {
-              await run(`contributions/${created.contribution.id}/proofs`, { fileName: file.name, dataBase64: await readFileBase64(file), kind: "PAYMENT" });
+              await uploadProof(poolApi(poolId, `contributions/${created.contribution.id}/proofs`), file, "PAYMENT");
             } catch (err) {
-              notify("error", `Contribution submitted, but the payment proof was not attached: ${errorMessage(err)} Open the contribution to attach it.`);
-              onDone();
+              // The contribution exists; the proof does not. Never pretend it
+              // was saved: open the contribution so it can be attached again.
+              notify("error", `Contribution #${created.contribution.id} was submitted, but the payment proof was NOT saved: ${errorMessage(err)} Attach it again below.`);
+              onDone(created.contribution.id);
               onClose();
               return;
+            } finally {
+              setUploading(false);
             }
           }
           notify("success", "Contribution submitted for review.");
@@ -127,7 +134,7 @@ function NewContribution({ open, onClose, onDone }: { open: boolean; onClose: ()
           setFields((x) => ({ ...x, file: "" }));
         }}
         error={fields.file || null}
-        disabled={pending}
+        disabled={pending || uploading}
       />
       <TextAreaField label="Note for the reviewer" value={notes} onChange={setNotes} maxLength={1000} rows={2} hint="Optional. For example, which account you paid from." />
     </FormDialog>
@@ -163,6 +170,12 @@ export function ContributionsView() {
   const [creating, setCreating] = useState(false);
   const [reviewing, setReviewing] = useState<number | null>(null);
   const res = usePoolResource<Paged<"contributions", Contribution>>("contributions", { status, page });
+  // Bumped whenever records change, so the NAV status card refetches too.
+  const [navKey, setNavKey] = useState(0);
+  const reload = () => {
+    res.reload();
+    setNavKey((k) => k + 1);
+  };
   const state = resourceState(res, "contributions");
   const rows = res.data?.contributions ?? [];
   const canCreate = can("contributions:create_own");
@@ -181,6 +194,9 @@ export function ContributionsView() {
           ) : undefined
         }
       />
+      <div className="mb-4">
+        <NavStatusCard key={navKey} compact />
+      </div>
       <FilterBar
         dirty={status !== ""}
         onReset={() => {
@@ -261,8 +277,16 @@ export function ContributionsView() {
             </>
           ))}
       </SectionCard>
-      <ReviewDrawer key={reviewing ?? "none"} id={reviewing} onClose={() => setReviewing(null)} onChanged={res.reload} />
-      {canCreate && <NewContribution key={String(creating)} open={creating} onClose={() => setCreating(false)} onDone={res.reload} />}
+      <ReviewDrawer key={reviewing ?? "none"} id={reviewing} onClose={() => setReviewing(null)} onChanged={reload} />
+      {canCreate && <NewContribution
+          key={String(creating)}
+          open={creating}
+          onClose={() => setCreating(false)}
+          onDone={(retryProofFor) => {
+            reload();
+            if (retryProofFor) setReviewing(retryProofFor);
+          }}
+        />}
     </>
   );
 }

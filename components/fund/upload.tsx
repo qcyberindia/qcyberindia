@@ -6,14 +6,20 @@
 // server verifies the real file type and size.
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { FileText, UploadCloud, X } from "lucide-react";
+import { ApiError, readApiResponse } from "@/components/fund/api";
 
 export const PROOF_ACCEPT = "image/png,image/jpeg,image/webp,application/pdf";
 export const MAX_PROOF_BYTES = 2 * 1024 * 1024;
 
+// A large image is shrunk in the browser before upload (prepareProofFile),
+// so only a PDF must already be within the server's 2 MB limit.
+const MAX_IMAGE_INPUT_BYTES = 20 * 1024 * 1024;
+
 export function proofFileProblem(file: File | null): string | null {
   if (!file) return null;
-  if (file.size > MAX_PROOF_BYTES) return "This file is larger than 2 MB. Crop the screenshot or export a smaller PDF.";
   if (!PROOF_ACCEPT.split(",").includes(file.type)) return "Use a PNG, JPEG or WebP screenshot, or a PDF.";
+  if (file.type === "application/pdf" && file.size > MAX_PROOF_BYTES) return "This PDF is larger than 2 MB. Export a smaller PDF or use a screenshot.";
+  if (file.size > MAX_IMAGE_INPUT_BYTES) return "This image is larger than 20 MB. Crop the screenshot first.";
   return null;
 }
 
@@ -125,7 +131,7 @@ export function ProofDropzone({
         >
           <UploadCloud size={20} className="text-[var(--qf-brass-dark)]" aria-hidden="true" />
           <span className="text-[13.5px] font-semibold text-[var(--qf-ink)]">Choose a file or drop it here</span>
-          <span className="text-[12px] text-[var(--qf-ink-soft)]">PNG, JPEG, WebP or PDF · up to 2 MB</span>
+          <span className="text-[12px] text-[var(--qf-ink-soft)]">PNG, JPEG or WebP screenshot, or a PDF up to 2 MB</span>
         </button>
       )}
       {problem ? (
@@ -135,4 +141,63 @@ export function ProofDropzone({
       )}
     </div>
   );
+}
+
+// Uploads above this are re-encoded first: reverse proxies commonly cap
+// request bodies at 1 MB, and phone screenshots are often larger.
+const SHRINK_ABOVE_BYTES = 900 * 1024;
+const MAX_EDGE_PX = 2000;
+
+async function encodeCanvas(canvas: HTMLCanvasElement, quality: number): Promise<Blob | null> {
+  return new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+}
+
+/**
+ * A large image is scaled down (longest edge 2000 px) and re-encoded as
+ * JPEG until it fits under ~900 KB. This also drops photo metadata such as
+ * location. PDFs and small files are sent unchanged. Never throws: if the
+ * browser cannot re-encode, the original file is used.
+ */
+export async function prepareProofFile(file: File): Promise<File> {
+  if (file.size <= SHRINK_ABOVE_BYTES || !file.type.startsWith("image/") || typeof createImageBitmap !== "function") return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, MAX_EDGE_PX / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const g = canvas.getContext("2d");
+    if (!g) return file;
+    g.fillStyle = "#ffffff"; // transparent PNG areas become white, not black
+    g.fillRect(0, 0, canvas.width, canvas.height);
+    g.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close();
+    for (const q of [0.85, 0.75, 0.6]) {
+      const blob = await encodeCanvas(canvas, q);
+      if (blob && blob.size <= SHRINK_ABOVE_BYTES) {
+        return new File([blob], file.name.replace(/\.[^.]+$/, "") + ".jpg", { type: "image/jpeg" });
+      }
+    }
+    return file;
+  } catch {
+    return file;
+  }
+}
+
+/**
+ * Sends a proof file to the pool API as multipart/form-data (raw bytes, no
+ * base64 overhead) and returns the stored proof's metadata. Throws ApiError.
+ */
+export async function uploadProof<T = unknown>(url: string, file: File, kind: "PAYMENT" | "RECEIVED"): Promise<T> {
+  const prepared = await prepareProofFile(file);
+  const form = new FormData();
+  form.append("file", prepared, prepared.name);
+  form.append("kind", kind);
+  let res: Response;
+  try {
+    res = await fetch(url, { method: "POST", credentials: "same-origin", cache: "no-store", body: form });
+  } catch {
+    throw new ApiError("NETWORK", "Could not reach the server. Check your connection and try again.", 0);
+  }
+  return readApiResponse<T>(res);
 }

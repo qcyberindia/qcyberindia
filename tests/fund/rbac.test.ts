@@ -36,6 +36,7 @@ const ADMIN_ONLY: FundPermission[] = [
   "corrections:backdate",
   "exports:run",
   "requests:review",
+  "chat:moderate",
   "pool:delete",
 ];
 
@@ -96,6 +97,16 @@ describe("role matrix", () => {
     }
     expect(can("VIEWER", "members:request_join")).toBe(true);
     expect(can("VIEWER", "contributions:view_all")).toBe(false);
+  });
+
+  it("Pool Chat: every active role, VIEWER included, reads and posts; only ADMIN moderates", () => {
+    for (const r of FUND_ROLES) {
+      expect(can(r, "chat:view"), `${r} chat:view`).toBe(true);
+      expect(can(r, "chat:post"), `${r} chat:post`).toBe(true);
+    }
+    expect(hasPermission({ userId: 9, role: "VIEWER", status: "suspended" }, "chat:post")).toBe(false);
+    expect(can("ADMIN", "chat:moderate")).toBe(true);
+    for (const r of ["MANAGER", "MEMBER", "VIEWER"] as const) expect(can(r, "chat:moderate"), r).toBe(false);
   });
 
   it("every role is in the matrix, ranked by privilege", () => {
